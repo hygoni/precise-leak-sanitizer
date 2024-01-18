@@ -49,11 +49,11 @@ Visually, reference counts are initialize like figure below. Note that in case w
 ### 2.2 Converting a virtual address to reference count
 ```c
 /* @addr might be in the middle of a buffer */
-uint8_t addr_to_refcnt(void *addr)
+uint8_t *addr_to_refcnt_addr(void *addr)
 {
      int8_t *refcnt_addr = refcnt_start + ((unsigned long long)addr) / 16;
      while (*refcnt_addr < 0) {
-         *refcnt_addr += *refcnt_addr;
+         refcnt_addr += *refcnt_addr;
      }
      return refcnt_addr;
 }
