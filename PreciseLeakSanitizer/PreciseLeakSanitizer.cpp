@@ -1,63 +1,75 @@
-#include "llvm/Pass.h"
+#include "PreciseLeakSanitizer.h"
+
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
 
-namespace {
+void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) { return; }
 
-struct PreciseLeakSanitizer : public PassInfoMixin<PreciseLeakSanitizer> {
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
-    bool transformed = false;
-    for (auto &F : M) {
-      for (auto &BB : F) {
-        for (auto &I : BB) {
-          if (auto *CI = dyn_cast<CallInst>(&I)) {
-            IRBuilder builder(CI);
+void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) { return; }
 
-            if (CI->getName() == "malloc") {
+void PreciseLeakSanVisitor::visitCallInst(CallInst &I) { return; }
 
-            } else if (CI->getName() == "calloc") {
+void PreciseLeakSanVisitor::visitCallMalloc(CallInst &I) { return; }
 
-            } else if (CI->getName() == "realloc") {
+void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) { return; }
 
-            } else if (CI->getName() == "new") {
+void PreciseLeakSanVisitor::visitCallNew(CallInst &I) { return; }
 
-            } else if (CI->getName() == "new[]") {
+void PreciseLeakSanVisitor::visitCallArrTyNew(CallInst &I) { return; }
 
-            } else if (CI->getName() == "free") {
+void PreciseLeakSanVisitor::visitCallFree(CallInst &I) { return; }
 
-            } else if (CI->getName() == "memset") {
+void PreciseLeakSanVisitor::visitCallMemset(CallInst &I) { return; }
 
-            } else if (CI->getName() == "memcpy") {
+void PreciseLeakSanVisitor::visitCallMemcpy(CallInst &I) { return; }
 
-            } else if (CI->getName() == "memmove") {
+void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 
-            } else if (CI->getName() == "bzero") {
-            }
-          } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+void PreciseLeakSanVisitor::visitCallBzero(CallInst &I) { return; }
 
-          } else if (auto *RI = dyn_cast<ReturnInst>(&I)) {
-          }
-        }
+bool PreciseLeakSanitizer::initializeModule(Module &M) { return false; }
+
+bool PreciseLeakSanitizer::run(Module &M) {
+  for (Function &F : M) {
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        PreciseLeakSanVisitor().visit(I);
       }
     }
-    return (transformed ? PreservedAnalyses::none() : PreservedAnalyses::all());
-  };
-};
+  }
+  return false;
+}
 
-} // namespace
+PreservedAnalyses PreciseLeakSanitizerPass::run(Module &M,
+                                                ModuleAnalysisManager &) {
+  return (PreciseLeakSanitizer().run(M) ? PreservedAnalyses::none()
+                                        : PreservedAnalyses::all());
+}
+
+llvm::PassPluginLibraryInfo getPreciseLeakSanitizerPluginInfo() {
+  return {LLVM_PLUGIN_API_VERSION, "precise-leak-sanitizer",
+          LLVM_VERSION_STRING, [](PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](StringRef Name, ModulePassManager &MPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                  if (Name == "precise-leak-sanitizer") {
+                    MPM.addPass(PreciseLeakSanitizerPass());
+                    return true;
+                  }
+                  return false;
+                });
+            PB.registerPipelineStartEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel Level) {
+                  MPM.addPass(PreciseLeakSanitizerPass());
+                });
+          }};
+}
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
-  return {.APIVersion = LLVM_PLUGIN_API_VERSION,
-          .PluginName = "PreciseLeakSanitizer",
-          .PluginVersion = "v0.1",
-          .RegisterPassBuilderCallbacks = [](PassBuilder &PB) {
-            PB.registerPipelineStartEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel Level) {
-                  MPM.addPass(PreciseLeakSanitizer());
-                });
-          }};
+  return getPreciseLeakSanitizerPluginInfo();
 }
