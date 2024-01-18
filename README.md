@@ -18,5 +18,8 @@ $ make -j$(nproc)
 $ clang -fpass-plugin=`echo build/PreciseLeakSanitizer/PreciseLeakSanitizer.so` <source file>
 ```
 
+# Before committing code to the repository
+To check if your code follows right coding style, run scripts/check-coding-style.sh. Or you can execute script/apply-coding-style.sh that automatically adjusts your code to follow the style. (clang-format command is required)
+
 # Documentation
 - [Pseudocode for PreciseLeakSanitizer](./Documentation/pseudocode/pseudocode.md)
