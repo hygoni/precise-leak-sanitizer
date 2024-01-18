@@ -4,14 +4,14 @@ This document specifies pseudocode for the implementation of PreciseLeakSanitize
 
 ## Table of Contents
 1. [Minimum alignment for allocation](#minimum-alignment-for-allocation)
-2. [Reference Count Encoding](#reference-count-encoding)
-	2.1 [Initializing reference count](#initializing-reference-count)
-	2.2 [Converting a virtual address to reference count](#converting-a-virtual-address-to-reference-count)
+2. [Reference Count Encoding](#reference-count-encoding)   
+	2.1 [Initializing reference count](#initializing-reference-count)  
+	2.2 [Converting a virtual address to reference count](#converting-a-virtual-address-to-reference-count)  
 3. [mmap()ing Reference Counting Address Space](#mmaping-reference-counting-address-space)
-4. [Tracking reference count of a buffer](#tracking-reference-count-of-a-buffer)
-	4.1 [When reference count is incremented](#when-reference-count-is-incremented)
-	4.2 [When reference count is decremented](#when-reference-count-is-decremented)
-	4.3 [More considerations and optimizations](#more-considerations-and-optimizations)
+4. [Tracking reference count of a buffer](#tracking-reference-count-of-a-buffer)  
+	4.1 [When reference count is incremented](#when-reference-count-is-incremented)  
+	4.2 [When reference count is decremented](#when-reference-count-is-decremented)  
+	4.3 [More considerations and optimizations](#more-considerations-and-optimizations)  
 ## 1. Minimum alignment for allocation
 To ensure shadow memory work correctly, the size of each allocation must be aligned to a specific size. For reduced address space overhead, **we align the allocation size to 16 bytes.** This means that the size argument of malloc(), realloc(), calloc(), new and new[] must be aligned before calling these functions. **Note: If the size is not a constant, it should be replaced with an appropriate instruction, rather than a fixed constant.**
 
