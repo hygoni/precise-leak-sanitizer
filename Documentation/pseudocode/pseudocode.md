@@ -13,7 +13,8 @@ This document specifies pseudocode for the implementation of PreciseLeakSanitize
 	4.2 [When reference count is decremented](#when-reference-count-is-decremented)  
 	4.3 [More considerations and optimizations](#more-considerations-and-optimizations)  
         4.3.1 [When a function exits](#when-a-function-exits)  
-        4.3.2 [Not instrumenting when storing to stack variables](#not-instrumenting-when-storing-to-stack-variables)    
+        4.3.2 [Freed pointer variables either on heap or on stack should be initialized to NULL](#freed-pointer-variables-either-on-the-heap-or-on-the-stack-should-be-initialized-to-null)  
+        4.3.3 [Not instrumenting when storing to stack variables](#not-instrumenting-when-storing-to-stack-variables)    
 ## 1. Minimum alignment for allocation
 To ensure shadow memory work correctly, the size of each allocation must be aligned to a specific size. For reduced address space overhead, **we align the allocation size to 16 bytes.** This means that the size argument of malloc(), realloc(), calloc(), new and new[] must be aligned before calling these functions. **Note: If the size is not a constant, it should be replaced with an appropriate instruction, rather than a fixed constant.**
 
@@ -199,6 +200,36 @@ if the function's return type is a pointer:
     insert a CallInst to reportMemoryLeak() after the CallInst
 ```
 
+#### 4.3.2 Freed pointer variables (either on the heap or on the stack) should be initialized to NULL
 
-#### 4.3.2 Not instrumenting when storing to stack variables
+If any pointer variable is freed (either a variable on the stack or on the heap), it must be initialized to NULL. This is because the PreciseLeakDetector can malfunction when it stores data to an uninitialized variable.
+
+Let's look at an example:
+
+```c
+void foo(void *addr)
+{
+    void *p =  addr;
+}
+
+int main(void)
+{
+  void *ptr = malloc(10);
+
+  foo(ptr);
+  foo(NULL);
+}
+```
+
+![calling foo() the first time](./images/calling-foo-the-first-time.png)
+
+Just before calling foo() in main(), the reference count of the buffer is 1. After calling foo() the first time, the reference count should still be 1 when foo() exits.
+
+![calling foo() the second time](./images/calling-foo-the-second-time.png)
+
+But on the second time foo() is called, the reference count might become zero because the uninitialized value of p is still a valid pointer. That's why every pointer variable needs to be initialized to zero when it's freed.
+
+This applies to heap objects in the same manner. Basically when free() is called, PLSAN must scan the freed object to find valid pointers within the freed object, and then it decrements reference counts of buffers referenced by such pointers as explained in the [section 4.2](#42-when-reference-count-is-decremented). After decrementing a reference count, the pointer should be set to NULL for the same reason as pointer variables on the stack.
+
+#### 4.3.3 Not instrumenting when storing to stack variables
 I believe it is possible to avoid instrumenting StoreInsts for local variables, but need to think more about it.
