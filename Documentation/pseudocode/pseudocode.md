@@ -46,8 +46,9 @@ for (int i = 1; i < size / 16; i++) {
 
 Visually, reference counts are initialize like figure below. Note that in case where size is bigger than 128 * 16, storing -128 is ok because the first reference count is still reachable.
 
-![reference count figure](./images/reference-count.png)
-
+<p align="center">
+<img src="./images/reference-count.png" alt="reference count figure" width="600px"/>
+</p>
 
 ### 2.2 Converting a virtual address to reference count
 ```c
@@ -71,7 +72,9 @@ More specifically, we allocate **anonymous mapping (MAP_ANONYMOUS)** as opposed 
 
 By the way 1/16 of total address space is huge size, as operating systems usually does not allow allocating much larger virtual address space than . Read [memory overcommit](https://en.wikipedia.org/wiki/Memory_overcommitment) for more detail; In short, **you need to pass MAP_NORESERVE** flag to mmap() to avoid issues on allocating very large address space.
 
-![shadow memory figure](./images/shadow-memory.png)
+<p align="center">
+<img src="./images/shadow-memory.png" alt="shadow memory" width="600px"/>
+</p>
 
 ## 4. Tracking reference count of a buffer
 
@@ -221,11 +224,15 @@ int main(void)
 }
 ```
 
-![calling foo() the first time](./images/calling-foo-the-first-time.png)
+<p align="center">
+<img src="./images/calling-foo-the-first-time.png" alt="calling foo() the first time" width="600px"/>
+</p>
 
 Just before calling foo() in main(), the reference count of the buffer is 1. After calling foo() the first time, the reference count should still be 1 when foo() exits.
 
-![calling foo() the second time](./images/calling-foo-the-second-time.png)
+<p align="center">
+<img src="./images/calling-foo-the-second-time.png" alt="calling foo() the second time" width="600px"/>
+</p>
 
 But on the second time foo() is called, the reference count might become zero because the uninitialized value of p is still a valid pointer. That's why every pointer variable needs to be initialized to zero when it's freed.
 
