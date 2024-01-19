@@ -3,18 +3,18 @@
 This document specifies pseudocode for the implementation of PreciseLeakSanitizer. It is a memory leak detector that can find memory leaks at runtime similar to [the leak sanitizer in LLVM and GCC](https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer). It is designed to pinpoint where the process lost its last reference efficiently.
 
 ## Table of Contents
-1. [Minimum alignment for allocation](#minimum-alignment-for-allocation)
-2. [Reference Count Encoding](#reference-count-encoding)   
-	2.1 [Initializing reference count](#initializing-reference-count)  
-	2.2 [Converting a virtual address to reference count](#converting-a-virtual-address-to-reference-count)  
-3. [mmap()ing Reference Counting Address Space](#mmaping-reference-counting-address-space)
-4. [Tracking reference count of a buffer](#tracking-reference-count-of-a-buffer)  
-	4.1 [When reference count is incremented](#when-reference-count-is-incremented)  
-	4.2 [When reference count is decremented](#when-reference-count-is-decremented)  
-	4.3 [More considerations and optimizations](#more-considerations-and-optimizations)  
-        4.3.1 [When a function exits](#when-a-function-exits)  
-        4.3.2 [Freed pointer variables either on heap or on stack should be initialized to NULL](#freed-pointer-variables-either-on-the-heap-or-on-the-stack-should-be-initialized-to-null)  
-        4.3.3 [Not instrumenting when storing to stack variables](#not-instrumenting-when-storing-to-stack-variables)    
+1. [Minimum alignment for allocation](#1-minimum-alignment-for-allocation)
+2. [Reference Count Encoding](#2-reference-count-encoding)   
+	- 2.1 [Initializing reference count](#21-initializing-reference-count)  
+	- 2.2 [Converting a virtual address to reference count](#22-converting-a-virtual-address-to-reference-count)  
+3. [mmap()ing Reference Counting Address Space](#3-mmaping-reference-counting-address-space)
+4. [Tracking reference count of a buffer](#4-tracking-reference-count-of-a-buffer)  
+	- 4.1 [When reference count is incremented](#41-when-reference-count-is-incremented)  
+	- 4.2 [When reference count is decremented](#42-when-reference-count-is-decremented)  
+	- 4.3 [More considerations and optimizations](#43-more-considerations-and-optimizations)  
+        - 4.3.1 [When a function exits](#431-when-a-function-exits)  
+        - 4.3.2 [Freed pointer variables either on heap or on stack should be initialized to NULL](#432-freed-pointer-variables-either-on-the-heap-or-on-the-stack-should-be-initialized-to-null)  
+        - 4.3.3 [Not instrumenting when storing to stack variables](#433-not-instrumenting-when-storing-to-stack-variables)    
 ## 1. Minimum alignment for allocation
 To ensure shadow memory work correctly, the size of each allocation must be aligned to a specific size. For reduced address space overhead, **we align the allocation size to 16 bytes.** This means that the size argument of malloc(), realloc(), calloc(), new and new[] must be aligned before calling these functions. **Note: If the size is not a constant, it should be replaced with an appropriate instruction, rather than a fixed constant.**
 
@@ -78,7 +78,7 @@ By the way 1/16 of total address space is huge size, as operating systems usuall
 
 ## 4. Tracking reference count of a buffer
 
-As explained in [2.1 Initializing reference count](#initializing-reference-count) section, the reference count is initialized when allocating memory. Reference count is incremented or decremented, but when it reaches zero, generally it is a memory leak. But there are few exceptions on this. Read [section 4.3.1](#when-a-function-exists) for more details.
+As explained in [2.1 Initializing reference count](#21-initializing-reference-count) section, the reference count is initialized when allocating memory. Reference count is incremented or decremented, but when it reaches zero, generally it is a memory leak. But there are few exceptions on this. Read [section 4.3.1](#431-when-a-function-exits) for more details.
 
 ### 4.1 When reference count is incremented
 Reference count is incremented when:
@@ -98,7 +98,7 @@ Reference count is decremented when:
 
 #### 4.3.1 When a function exits
 
-As stated in [section 4.2](#when-reference-count-is-decremented), local variables are automatically freed at function exit and thus the reference count of buffers referenced by local pointer variables should be decremented.
+As stated in [section 4.2](#42-when-reference-count-is-decremented), local variables are automatically freed at function exit and thus the reference count of buffers referenced by local pointer variables should be decremented.
 
 However, even if the reference count becomes zero, it might not be a memory leak if the pointer is the return value of a function. In that case, it is possible that the pointer value is written back to memory.
 
