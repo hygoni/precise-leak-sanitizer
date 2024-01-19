@@ -7,10 +7,15 @@
 
 #include <cstddef>
 
+__plsan::Plsan *plsan;
+
 /* Initialization routines called before main() */
 __attribute__((constructor)) void __plsan_init() { /* TODO: */
-  __plsan::Plsan *plsan;
+  plsan = new __plsan::Plsan();
 }
+
+/* finialization routines called after main()*/
+__attribute__((destructor)) void __plsan_fini() { delete plsan; }
 
 void __plsan_alloc(void *addr, size_t size) {
   /* TODO: initialize references */

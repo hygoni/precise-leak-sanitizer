@@ -10,6 +10,7 @@ namespace __plsan {
 class PlsanShadow {
 public:
   PlsanShadow();
+  ~PlsanShadow();
   void alloc_shadow(void *addr, size_t size);
   void update_reference(void **lhs, void *rhs);
 

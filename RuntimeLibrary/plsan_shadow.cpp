@@ -11,6 +11,8 @@ PlsanShadow::PlsanShadow() {
     throw "mmap failed\n";
 }
 
+PlsanShadow::~PlsanShadow() { munmap(shadow_addr, MMAP_SIZE); }
+
 void PlsanShadow::alloc_shadow(void *addr, size_t size) {}
 
 void PlsanShadow::update_reference(void **lhs, void *rhs) {}
