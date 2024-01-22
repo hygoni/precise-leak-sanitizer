@@ -5,7 +5,8 @@
 
 namespace __plsan {
 
-#define MMAP_SIZE ((1L << 48) / 16)
+#define MIN_DYN_ALLOC_SIZE 16
+#define MMAP_SIZE ((1L << 48) / MIN_DYN_ALLOC_SIZE)
 
 class PlsanShadow {
 public:

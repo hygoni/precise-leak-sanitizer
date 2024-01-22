@@ -10,8 +10,11 @@ namespace __plsan {
 class Plsan {
 public:
   Plsan();
-  // long align_size(long size);
 
+  // Instrumentation function
+  long align_size(long size);
+  void init_refcnt(void *addr, size_t size);
+  void reference_count(void **lhs, void *rhs);
   void enter_func();
   void exit_func();
 
