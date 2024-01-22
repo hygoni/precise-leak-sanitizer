@@ -15,6 +15,9 @@ This document specifies pseudocode for the implementation of PreciseLeakSanitize
         - 4.3.1 [When a function exits](#431-when-a-function-exits)  
         - 4.3.2 [Freed pointer variables either on heap or on stack should be initialized to NULL](#432-freed-pointer-variables-either-on-the-heap-or-on-the-stack-should-be-initialized-to-null)  
         - 4.3.3 [Not instrumenting when storing to stack variables](#433-not-instrumenting-when-storing-to-stack-variables)    
+5. [Report a memory leak](#5-reporting-a-memory-leak)
+    - [5.2 Storing stack backtrace when memory is allocated](#51-storing-stack-backtrace-when-memory-is-allocated)
+
 ## 1. Minimum alignment for allocation
 To ensure shadow memory work correctly, the size of each allocation must be aligned to a specific size. For reduced address space overhead, **we align the allocation size to 16 bytes.** This means that the size argument of malloc(), realloc(), calloc(), new and new[] must be aligned before calling these functions. **Note: If the size is not a constant, it should be replaced with an appropriate instruction, rather than a fixed constant.**
 
@@ -240,3 +243,45 @@ This applies to heap objects in the same manner. Basically when free() is called
 
 #### 4.3.3 Not instrumenting when storing to stack variables
 I believe it is possible to avoid instrumenting StoreInsts for local variables, but need to think more about it.
+
+### 5. Reporting a memory leak
+
+Let's look at what the report by PLSAN would look like. Below is an example program with a memory leak:
+
+```c
+   1   │ #include <stdlib.h>
+   2   │
+   3   │ int main(void)
+   4   │ {
+   5   │   void *ptr = malloc(10);
+   6   │
+   7   │   ptr = NULL;
+   8   │
+   9   │   return 0;
+  10   │ }
+```
+
+The report will look like this:
+
+```bash
+=================================================================
+==<Process Number>==ERROR: PreciseLeakSanitizer: detected memory leaks
+
+Leak of 10 byte(s) in an object (<address of the object>) allocated from:
+    #1 0x401137 in main /home/hyeyoo/precise-leak-sanitizer/main.c:5
+    #2 0x7fd7dd83feaf in __libc_start_call_main (/lib64/libc.so.6+0x3feaf)
+
+Last reference to the object (<address of the object>) lost at:
+    #1 0x401150 in main /home/hyeyoo/precise-leak-sanitizer/main.c:7
+    #2 0x7fd7dd83feaf in __libc_start_call_main (/lib64/libc.so.6+0x3feaf)
+```
+
+It shows 1) **where the object is allocated** and 2) **where the last reference to it is lost.** To show where it is allocated, PLSAN should store stack backtrace when a memory allocation function is called. Printing stack backtrace when the last reference to the object is lost is done by printing it immediately.
+
+## 5.1 Storing stack backtrace when memory is allocated
+
+It is worth noting that **deduplication matters** when the number of allocated memory blocks is huge. de-duplication generally means avoiding duplication of data. For PLSAN, it means not storing the same stack backtrace more than once. It matters for PLSAN because it is extremely common to allocate objects several times, in the same call path.
+
+KASAN (Kernel ASAN) has similar deduplication mechanism called [stackdepot](https://elixir.bootlin.com/linux/v6.8-rc1/source/lib/stackdepot.c) and I (the author, Hyeonggon) am pretty sure ASAN has similar deduplication mechanism. It would be unnecessary to implement our own deduplication mechanism if we implement PLSAN as a [static plugin](https://github.com/banach-space/llvm-tutor?tab=readme-ov-file#dynamic-vs-static-plugins) because we may utilize what's already in LLVM, but before we start porting PLSAN to LLVM we need our own implementation.
+
+One idea for deduplication is to have to two maps (either hashmap or treemap): one that converts 1) object address to a unique ID (possibly hash value of stack backtrace), and the other that converts the unique ID to actual stack backtrace.
