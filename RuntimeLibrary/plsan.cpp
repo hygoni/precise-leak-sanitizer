@@ -14,27 +14,24 @@ __attribute__((constructor)) void __plsan_init() { /* TODO: */
   plsan = new __plsan::Plsan();
 }
 
-/* finialization routines called after main()*/
+/* finialization routines called after main() */
 __attribute__((destructor)) void __plsan_fini() { delete plsan; }
 
-void __plsan_align(long size) {}
+size_t __plsan_align(size_t size) { return plsan->align_size(size); }
 
-void __plsan_alloc(void *addr, size_t size) {
-  /* TODO: initialize references */
+void __plsan_alloc(void *addr, size_t size) { plsan->init_refcnt(addr, size); }
+
+void __plsan_free(void *addr) { plsan->fini_refcnt(addr); }
+
+void __plsan_store(void **lhs, void *rhs) { plsan->reference_count(lhs, rhs); }
+
+void __plsan_free_stack_variables(std::initializer_list<void *> var_addrs) {
+  plsan->free_stack_variables(var_addrs);
 }
 
-void __plsan_store(void **lhs, void *rhs) { /* TODO: update references */
-}
-
-void __plsan_enter_func() {}
-
-void __plsan_exit_func() {
-  /*
-   *  TODO: check if
-   *  1) the address of lost meomry is written back to memory before
-   *     returning the function
-   *  2) or the address of a buffer is return value
-   */
+void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
+                                            void *compare_ptr_addr) {
+  plsan->check_returned_or_stored_value(ret_ptr_addr, compare_ptr_addr);
 }
 
 namespace __plsan {
@@ -44,18 +41,55 @@ Plsan::Plsan() {
   handler = new PlsanHandler();
 }
 
-long Plsan::align_size(long size) { return 0; }
-
-void Plsan::init_refcnt(void *addr, size_t size) {}
-
-void Plsan::reference_count(void **lhs, void *rhs) {}
-
-void Plsan::enter_func() {
-  // enter_func
+Plsan::~Plsan() {
+  delete shadow;
+  delete handler;
 }
 
-void Plsan::exit_func() {
-  // exit_func
+size_t Plsan::align_size(size_t size) { return (size + 15) & ~15; }
+
+void Plsan::init_refcnt(void *addr, size_t size) {
+  shadow->alloc_shadow(addr, size);
+}
+
+void Plsan::fini_refcnt(void *addr) { shadow->free_shadow(addr); }
+
+void Plsan::reference_count(void **lhs, void *rhs) {
+  shadow->update_shadow(*lhs, rhs);
+  check_memory_leak(*lhs);
+}
+
+void Plsan::free_stack_variables(std::initializer_list<void *> var_addrs) {
+  for (void *var_addr : var_addrs) {
+    shadow->add_shadow(var_addr, 1);
+    check_memory_leak(var_addr);
+  }
+}
+
+void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
+                                           void *compare_ptr_addr) {
+  RefCountAnalysis analysis_result = shadow->shadow_analysis(ret_ptr_addr);
+  // check address type
+  if (std::get<0>(analysis_result) == NonDynAlloc) {
+    return;
+  } else if (!shadow->shadow_value_is_equal(ret_ptr_addr, compare_ptr_addr)) {
+    check_memory_leak(analysis_result);
+  }
+}
+
+void Plsan::check_memory_leak(void *addr) {
+  RefCountAnalysis analysis_result = shadow->shadow_analysis(addr);
+  // check exception type
+  if (std::get<1>(analysis_result) == RefCountZero) {
+    handler->exception_check(analysis_result);
+  }
+}
+
+void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
+  // check exception type
+  if (std::get<1>(analysis_result) == RefCountZero) {
+    handler->exception_check(analysis_result);
+  }
 }
 
 } // namespace __plsan
