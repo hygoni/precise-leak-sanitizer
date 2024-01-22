@@ -41,7 +41,6 @@ namespace __plsan {
 
 Plsan::Plsan() {
   shadow = new PlsanShadow();
-  storage = new PlsanStorage();
   handler = new PlsanHandler();
 }
 
