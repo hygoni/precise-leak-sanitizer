@@ -52,6 +52,10 @@ Visually, reference counts are initialize like figure below. Note that in case w
 <p align="center">
 <img src="./images/reference-count.png" alt="reference count figure" width="600px"/>
 </p>
+Additionally, determining whether the memory address is dynamically allocated is crucial for identifying memory leaks. Memory allocated with mmap() is initialized to 0 when accessed. The reason for initializing the reference count to 127 is to distinguish dynamically allocated memory addresses. When dynamically allocated memory is referenced, the reference count is updated by decrementing it from 127.
+
+1. If the converted address in shadow memory is 0, it indicates that the memory address belongs to a stack variable (or non-dynamically allocated memory) or unallocated in the heap.
+2. If the value at converted address in shadow memory is positive, it indicates that the memory address belongs to dynamically allocated memory.
 
 ### 2.2 Converting a virtual address to reference count
 ```c
