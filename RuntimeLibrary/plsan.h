@@ -3,7 +3,6 @@
 
 #include "plsan_handler.h"
 #include "plsan_shadow.h"
-#include "plsan_storage.h"
 
 namespace __plsan {
 
@@ -20,7 +19,6 @@ public:
 
 private:
   PlsanShadow *shadow;
-  PlsanStorage *storage;
   PlsanHandler *handler;
 };
 
