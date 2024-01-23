@@ -14,6 +14,7 @@ set(HEADERS
     plsan.h
     plsan_handler.h
     plsan_shadow.h
+    lib/backward.h
 )
 
 # Add library target
@@ -21,3 +22,4 @@ add_library(plsan STATIC ${SOURCES} ${HEADERS})
 
 # Specify include directories
 target_include_directories(plsan PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(plsan PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
