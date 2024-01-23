@@ -29,6 +29,11 @@ void __plsan_free_stack_variables(std::initializer_list<void *> var_addrs) {
   plsan->free_stack_variables(var_addrs);
 }
 
+void __plsan_free_stack_arrays(
+    std::initializer_list<std::tuple<void *, size_t>> arr_addrs_and_lens) {
+  plsan->free_stack_arrays(arr_addrs_and_lens);
+}
+
 void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
                                             void *compare_ptr_addr) {
   plsan->check_returned_or_stored_value(ret_ptr_addr, compare_ptr_addr);
@@ -66,6 +71,19 @@ void Plsan::free_stack_variables(std::initializer_list<void *> var_addrs) {
   }
 }
 
+void Plsan::free_stack_arrays(
+    std::initializer_list<std::tuple<void *, size_t>> arr_addrs_and_lens) {
+  for (std::tuple<void *, size_t> arr_tuple : arr_addrs_and_lens) {
+    void *array_start_addr = std::get<0>(arr_tuple);
+    size_t size = std::get<1>(arr_tuple);
+    for (int i = 0; i < size; i++) {
+      void *ptr_value = ptr_array_value(array_start_addr, i);
+      shadow->add_shadow(ptr_value, 1);
+      check_memory_leak(ptr_value);
+    }
+  }
+}
+
 void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
                                            void *compare_ptr_addr) {
   RefCountAnalysis analysis_result = shadow->shadow_analysis(ret_ptr_addr);
@@ -90,6 +108,11 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   if (std::get<1>(analysis_result) == RefCountZero) {
     handler->exception_check(analysis_result);
   }
+}
+
+void *ptr_array_value(void *array_start_addr, size_t index) {
+  int64_t *array_addr = (int64_t *)array_start_addr;
+  return (void *)(*(array_addr + index));
 }
 
 } // namespace __plsan
