@@ -7,6 +7,11 @@
 
 using namespace llvm;
 
+PreciseLeakSanitizer *Plsan;
+
+PreciseLeakSanVisitor::PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan)
+    : Plsan(Plsan) {}
+
 void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) { return; }
@@ -31,13 +36,51 @@ void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitCallBzero(CallInst &I) { return; }
 
-bool PreciseLeakSanitizer::initializeModule(Module &M) { return false; }
+bool PreciseLeakSanitizer::initializeModule() {
 
-bool PreciseLeakSanitizer::run(Module &M) {
-  for (Function &F : M) {
+  VoidTy = Type::getVoidTy(Ctx);
+  VoidPtrTy = PointerType::getUnqual(VoidTy);
+  VoidPtrPtrTy = PointerType::getUnqual(VoidPtrTy);
+  Int64Ty = Type::getInt64Ty(Ctx);
+
+  AlignFnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
+  AlignFn = Mod.getOrInsertFunction(AlignFnName, AlignFnTy);
+
+  AllocFnTy = FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty}, false);
+  AllocFn = Mod.getOrInsertFunction(AllocFnName, AllocFnTy);
+
+  FreeFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
+  FreeFn = Mod.getOrInsertFunction(FreeFnName, FreeFnTy);
+
+  StoreFnTy = FunctionType::get(VoidTy, {VoidPtrPtrTy, VoidPtrTy}, false);
+  StoreFn = Mod.getOrInsertFunction(StoreFnName, StoreFnTy);
+
+  FreeStackVariablesFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
+  FreeStackVariablesFn =
+      Mod.getOrInsertFunction(FreeStackVariablesFnName, FreeStackVariablesFnTy);
+
+  FreeStackArraysFnTy = FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty}, false);
+  FreeStackArraysFn =
+      Mod.getOrInsertFunction(FreeStackArraysFnName, FreeStackArraysFnTy);
+
+  CheckReturnedOrStoredValueFnTy =
+      FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy}, false);
+  CheckReturnedOrStoredValueFn = Mod.getOrInsertFunction(
+      CheckReturnedOrStoredValueFnName, CheckReturnedOrStoredValueFnTy);
+
+  return true;
+}
+
+PreciseLeakSanitizer::PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx)
+    : Mod(Mod), Ctx(Ctx) {}
+
+bool PreciseLeakSanitizer::run() {
+  Plsan->initializeModule();
+
+  for (Function &F : Mod) {
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
-        PreciseLeakSanVisitor().visit(I);
+        PreciseLeakSanVisitor(*Plsan).visit(I);
       }
     }
   }
@@ -46,8 +89,8 @@ bool PreciseLeakSanitizer::run(Module &M) {
 
 PreservedAnalyses PreciseLeakSanitizerPass::run(Module &M,
                                                 ModuleAnalysisManager &) {
-  return (PreciseLeakSanitizer().run(M) ? PreservedAnalyses::none()
-                                        : PreservedAnalyses::all());
+  Plsan = new PreciseLeakSanitizer(M, M.getContext());
+  return (Plsan->run() ? PreservedAnalyses::none() : PreservedAnalyses::all());
 }
 
 llvm::PassPluginLibraryInfo getPreciseLeakSanitizerPluginInfo() {
