@@ -24,13 +24,15 @@ void PlsanShadow::alloc_shadow(void *addr, size_t size) {
       *(shadow_addr + i) = std::max(-i, -SHADOW_INIT_VALUE - 1);
   }
   *shadow_addr = SHADOW_INIT_VALUE;
-  // printf("malloc shadow mem addr: %p\n", shadow_addr);
 }
 
 void PlsanShadow::free_shadow(void *addr) {
   ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
-  if (*shadow_addr > 0)
+  if (*shadow_addr > 0) {
     *shadow_addr = 0;
+    while (*(++shadow_addr) < 0)
+      *shadow_addr = 0;
+  }
 }
 
 void PlsanShadow::add_shadow(void *addr, int value) {
@@ -44,19 +46,8 @@ void PlsanShadow::add_shadow(void *addr, int value) {
 // Shadow class no need to know this logic, but remain this function for
 // convenience.
 void PlsanShadow::update_shadow(void *lhs, void *rhs) {
-  // ShadowBlockSize *lhs_shadow_addr = addr_to_shadow_addr(lhs);
-  // ShadowBlockSize *rhs_shadow_addr = addr_to_shadow_addr(rhs);
-
-  // // Have been initialized
-  // if (*lhs_shadow_addr > 0) *lhs_shadow_addr = *lhs_shadow_addr + 1;
-  // // Have been initialized
-  // if (*rhs_shadow_addr > 0) *rhs_shadow_addr = *rhs_shadow_addr - 1;
-
   add_shadow(lhs, 1);  // decreasing ref count
   add_shadow(rhs, -1); // increasing ref count
-
-  // printf("lhs %p: %d\n", lhs_shadow_addr, *lhs_shadow_addr);
-  // printf("rhs %p: %d\n", rhs_shadow_addr, *rhs_shadow_addr);
 }
 
 bool PlsanShadow::shadow_value_is_equal(void *a, void *b) {
