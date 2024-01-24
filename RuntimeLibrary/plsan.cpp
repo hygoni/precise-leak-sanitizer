@@ -17,25 +17,30 @@ __attribute__((constructor)) void __plsan_init() { /* TODO: */
 /* finialization routines called after main() */
 __attribute__((destructor)) void __plsan_fini() { delete plsan; }
 
-size_t __plsan_align(size_t size) { return plsan->align_size(size); }
+extern "C" size_t __plsan_align(size_t size) { return plsan->align_size(size); }
 
-void __plsan_alloc(void *addr, size_t size) { plsan->init_refcnt(addr, size); }
+extern "C" void __plsan_alloc(void *addr, size_t size) {
+  plsan->init_refcnt(addr, size);
+}
 
-void __plsan_free(void *addr) { plsan->fini_refcnt(addr); }
+extern "C" void __plsan_free(void *addr) { plsan->fini_refcnt(addr); }
 
-void __plsan_store(void **lhs, void *rhs) { plsan->reference_count(lhs, rhs); }
+extern "C" void __plsan_store(void **lhs, void *rhs) {
+  plsan->reference_count(lhs, rhs);
+}
 
-void __plsan_free_stack_variables(std::initializer_list<void *> var_addrs) {
+extern "C" void
+__plsan_free_stack_variables(std::initializer_list<void *> var_addrs) {
   plsan->free_stack_variables(var_addrs);
 }
 
-void __plsan_free_stack_arrays(
+extern "C" void __plsan_free_stack_arrays(
     std::initializer_list<std::tuple<void *, size_t>> arr_addrs_and_lens) {
   plsan->free_stack_arrays(arr_addrs_and_lens);
 }
 
-void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
-                                            void *compare_ptr_addr) {
+extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
+                                                       void *compare_ptr_addr) {
   plsan->check_returned_or_stored_value(ret_ptr_addr, compare_ptr_addr);
 }
 
@@ -110,7 +115,7 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   }
 }
 
-void *ptr_array_value(void *array_start_addr, size_t index) {
+void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
   int64_t *array_addr = (int64_t *)array_start_addr;
   return (void *)(*(array_addr + index));
 }
