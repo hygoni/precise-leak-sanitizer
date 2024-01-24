@@ -42,6 +42,8 @@ FEATURE(address_sanitizer,
                                    SanitizerKind::KernelAddress))
 FEATURE(leak_sanitizer,
         LangOpts.Sanitize.has(SanitizerKind::Leak))
+FEATURE(precise_leak_sanitizer,
+        LangOpts.Sanitize.has(SanitizerKind::PreciseLeak))
 FEATURE(hwaddress_sanitizer,
         LangOpts.Sanitize.hasOneOf(SanitizerKind::HWAddress |
                                    SanitizerKind::KernelHWAddress))

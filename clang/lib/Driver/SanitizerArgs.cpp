@@ -55,7 +55,8 @@ static const SanitizerMask SupportsCoverage =
     SanitizerKind::DataFlow | SanitizerKind::Fuzzer |
     SanitizerKind::FuzzerNoLink | SanitizerKind::FloatDivideByZero |
     SanitizerKind::SafeStack | SanitizerKind::ShadowCallStack |
-    SanitizerKind::Thread | SanitizerKind::ObjCCast | SanitizerKind::KCFI;
+    SanitizerKind::Thread | SanitizerKind::ObjCCast | SanitizerKind::KCFI |
+    SanitizerKind::PreciseLeak;
 static const SanitizerMask RecoverableByDefault =
     SanitizerKind::Undefined | SanitizerKind::Integer |
     SanitizerKind::ImplicitConversion | SanitizerKind::Nullability |
@@ -514,21 +515,26 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
   }
 
   std::pair<SanitizerMask, SanitizerMask> IncompatibleGroups[] = {
-      std::make_pair(SanitizerKind::Address,
-                     SanitizerKind::Thread | SanitizerKind::Memory),
+      std::make_pair(SanitizerKind::Address, SanitizerKind::Thread |
+                                                 SanitizerKind::Memory |
+                                                 SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::Thread, SanitizerKind::Memory),
-      std::make_pair(SanitizerKind::Leak,
-                     SanitizerKind::Thread | SanitizerKind::Memory),
+      std::make_pair(SanitizerKind::Leak, SanitizerKind::Thread |
+                                              SanitizerKind::Memory |
+                                              SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::KernelAddress,
                      SanitizerKind::Address | SanitizerKind::Leak |
-                         SanitizerKind::Thread | SanitizerKind::Memory),
+                         SanitizerKind::Thread | SanitizerKind::Memory |
+                         SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::HWAddress,
                      SanitizerKind::Address | SanitizerKind::Thread |
-                         SanitizerKind::Memory | SanitizerKind::KernelAddress),
+                         SanitizerKind::Memory | SanitizerKind::KernelAddress |
+                         SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::Scudo,
                      SanitizerKind::Address | SanitizerKind::HWAddress |
                          SanitizerKind::Leak | SanitizerKind::Thread |
-                         SanitizerKind::Memory | SanitizerKind::KernelAddress),
+                         SanitizerKind::Memory | SanitizerKind::KernelAddress |
+                         SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::SafeStack,
                      (TC.getTriple().isOSFuchsia() ? SanitizerMask()
                                                    : SanitizerKind::Leak) |
@@ -539,16 +545,18 @@ SanitizerArgs::SanitizerArgs(const ToolChain &TC,
                      SanitizerKind::Address | SanitizerKind::HWAddress |
                          SanitizerKind::Leak | SanitizerKind::Thread |
                          SanitizerKind::Memory | SanitizerKind::KernelAddress |
-                         SanitizerKind::SafeStack),
+                         SanitizerKind::SafeStack | SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::KernelMemory,
                      SanitizerKind::Address | SanitizerKind::HWAddress |
                          SanitizerKind::Leak | SanitizerKind::Thread |
                          SanitizerKind::Memory | SanitizerKind::KernelAddress |
-                         SanitizerKind::Scudo | SanitizerKind::SafeStack),
-      std::make_pair(SanitizerKind::MemTag,
-                     SanitizerKind::Address | SanitizerKind::KernelAddress |
-                         SanitizerKind::HWAddress |
-                         SanitizerKind::KernelHWAddress),
+                         SanitizerKind::Scudo | SanitizerKind::SafeStack |
+                         SanitizerKind::PreciseLeak),
+      std::make_pair(SanitizerKind::MemTag, SanitizerKind::Address |
+                                                SanitizerKind::KernelAddress |
+                                                SanitizerKind::HWAddress |
+                                                SanitizerKind::KernelHWAddress |
+                                                SanitizerKind::PreciseLeak),
       std::make_pair(SanitizerKind::KCFI, SanitizerKind::Function)};
   // Enable toolchain specific default sanitizers if not explicitly disabled.
   SanitizerMask Default = TC.getDefaultSanitizers() & ~AllRemove;

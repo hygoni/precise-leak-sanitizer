@@ -42,42 +42,40 @@ for test_case in $test_cases; do
   file_extension="${test_case##*.}"
 
   file_name=$(basename "$test_case")
-  
+
   # replace extension from filename.
   file_base_name="${file_name%.*}"
-  
+
   # add count
   ((_count++))
 
-  compile_options="-fpass-plugin=build/PreciseLeakSanitizer/PreciseLeakSanitizer.so"
-  compile_options+=" -g -c -Wno-everything"
-  link_options=" -L build/RuntimeLibrary -lplsan -ldw"
+  compile_options="-fsanitize=precise-leak"
+  compile_options+=" -g -Wno-everything"
+  link_options=" -ldw -lstdc++"
   # setting up compile options.
   if [ "$file_extension" == "cpp" ]; then
-    compiler=clang++
-    link_options+=" -lstdc++"
+    compiler=build/bin/clang++
   else
-    compiler=clang
+    compiler=build/bin/clang
     compile_options+=""
   fi
 
   # compiling and link
-  $compiler $test_case $compile_options -o $file_base_name.o && \
-    clang++ ./$file_base_name.o $link_options -o $file_base_name
+  $compiler $test_case $compile_options -o $file_base_name $link_options
 
   # is compilation successed?
   if [ $? -eq 0 ]; then
 
-    # execute testcases and save LeakSanitizer's output.
+    # execute testcases and save PreciseLeakSanitizer's output.
     sanitizer_output=$(./$file_base_name 2>&1)
 
     # Is it leak?
-    if [[ $sanitizer_output == *"LeakSanitizer"* ]];  then
+    if [[ $sanitizer_output == *"PreciseLeakSanitizer"* ]];  then
       echo "[$_count] Leak : $test_case"
 
       if [[ $(check_actual_output "$test_case") == 1 ]]; then # is it no leak?
         ((_FP++))
-        _FP_TC_LIST+=("    - $test_case\n")
+        _FP_TC_LIST+=("    - $test_case")
       else
         ((_TP++))
       fi
@@ -89,14 +87,14 @@ for test_case in $test_cases; do
         ((_TN++))
       else
         ((_FN++))
-        _FN_TC_LIST+=("    - $test_case\n")
+        _FN_TC_LIST+=("    - $test_case")
       fi
     fi
   else
     echo "Compilation Failed : $test_case"
   fi
 
-  rm -f ./$file_base_name ./$file_base_name.o
+  rm -f ./$file_base_name
 done
 
 # Print results

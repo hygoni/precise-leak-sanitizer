@@ -88,10 +88,12 @@ public:
   bool needsTsanRt() const { return Sanitizers.has(SanitizerKind::Thread); }
   bool needsMsanRt() const { return Sanitizers.has(SanitizerKind::Memory); }
   bool needsFuzzer() const { return Sanitizers.has(SanitizerKind::Fuzzer); }
+  bool needsPlsanRt() const { return Sanitizers.has(SanitizerKind::PreciseLeak); }
   bool needsLsanRt() const {
-    return Sanitizers.has(SanitizerKind::Leak) &&
-           !Sanitizers.has(SanitizerKind::Address) &&
-           !Sanitizers.has(SanitizerKind::HWAddress);
+    return Sanitizers.has(SanitizerKind::PreciseLeak) ||
+           (Sanitizers.has(SanitizerKind::Leak) &&
+            !Sanitizers.has(SanitizerKind::Address) &&
+            !Sanitizers.has(SanitizerKind::HWAddress));
   }
   bool needsFuzzerInterceptors() const;
   bool needsUbsanRt() const;

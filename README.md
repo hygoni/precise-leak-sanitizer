@@ -5,17 +5,26 @@ PreciseLeakSanitizer is a dynamic memory leak detector that can pinpoint where m
 
 You need LLVM 17 to build this project.
 
-## Build the pass
+## Build LLVM, Clang and compiler-rt
 ```bash
 $ mkdir build
 $ cd build
-$ cmake ..
+$ cmake -DLLVM_ENABLE_PROJECTS="llvm;clang;compiler-rt" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -G "Unix Makefiles" \
+        ../llvm
 $ make -j$(nproc)
 ```
 
-## Compile the program with PreciseLeakSanitizer pass
+## Compile the program with -fsanitize=precise-leak
+
+Just as other sanitizers, passing -fsanitize=precise-leak option enables PreciseLeakSanitizer. PreciseLeakSanitizer automatically enables LeakSanitizer, but it is not intended to be ran with any other sanitizers other than LeakSanitizer.
+
+Use clang or clang++ depending on which language you use, but always add link option -ldw and -lstdc++. -ldw is used for printing stack traces, -lstdc++ is used by runtime library. These may be fixed in the future, but this is where we are now.
+
+
 ```bash
-$ clang -fpass-plugin=`echo build/PreciseLeakSanitizer/PreciseLeakSanitizer.so` <source file>
+$ ./build/bin/clang -fsanitize=precise-leak <source file> -ldw -lstdc++
 ```
 
 # Before committing code to the repository
