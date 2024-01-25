@@ -103,7 +103,39 @@ void PreciseLeakSanVisitor::visitLLVMStacksave(CallInst &I) {
   LocalPtrArrListStack.push(std::vector<ArrayAddrInfo>());
 }
 
-void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) { return; }
+void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
+  // Call __plsan_free_stack_array, variable length array
+  // LocalPtrVLAListStack size and LocalStackrestoreStack size are always same.
+  IRBuilder<> Builder(&I);
+  Value *NullPtr = ConstantPointerNull::get(Plsan.VoidPtrTy);
+  Value *FalseValue = ConstantInt::getFalse(Plsan.Ctx);
+
+  std::vector<Value *> TopLocalPtrVarList = LocalPtrVarListStack.top();
+  std::vector<ArrayAddrInfo> TopLocalPtrArrList = LocalPtrArrListStack.top();
+
+  ConstantInt *VarCount = Builder.getInt64(TopLocalPtrVarList.size());
+  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), FalseValue);
+  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), NullPtr);
+  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), VarCount);
+  ArrayRef<Value *> VarArgs = ArrayRef<Value *>(TopLocalPtrVarList);
+  CallInst *FreeStackVariablesFnCall =
+      Builder.CreateCall(Plsan.FreeStackVariablesFn, VarArgs);
+  LazyCheckInfoStack.push(FreeStackVariablesFnCall);
+
+  // Stack pointer restored, then pop local variable stack.
+  LocalPtrVarListStack.pop();
+
+  for (ArrayAddrInfo ArrAddrAndSize : TopLocalPtrArrList) {
+    Value *ArrAddr = std::get<0>(ArrAddrAndSize);
+    Value *Size = std::get<1>(ArrAddrAndSize);
+    CallInst *FreeStackArrayFnCall = Builder.CreateCall(
+        Plsan.FreeStackArrayFn, {ArrAddr, Size, NullPtr, FalseValue});
+    LazyCheckInfoStack.push(FreeStackArrayFnCall);
+  }
+
+  // Stack pointer restored, then pop local variable stack.
+  LocalPtrArrListStack.pop();
+}
 
 bool PreciseLeakSanitizer::initializeModule() {
 
