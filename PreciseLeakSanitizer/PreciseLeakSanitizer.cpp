@@ -43,6 +43,10 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   Value *ReturnValue = I.getReturnValue();
   Value *TrueValue = ConstantInt::getTrue(Plsan.Ctx);
 
+  // if return value is void
+  if (ReturnValue == NULL)
+    ReturnValue = ConstantPointerNull::get(Plsan.VoidPtrTy);
+
   std::vector<Value *> TopLocalPtrVarList = LocalPtrVarListStack.top();
   std::vector<ArrayAddrInfo> TopLocalPtrArrList = LocalPtrArrListStack.top();
 
@@ -107,6 +111,9 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
                          {RetAddr, CompareAddr});
     } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
       Value *CompareAddr = Inst->getReturnValue();
+      // if return value is void
+      if (CompareAddr == NULL)
+        CompareAddr = ConstantPointerNull::get(Plsan.VoidPtrTy);
       Builder.CreateCall(Plsan.CheckReturnedOrStoredValueFn,
                          {RetAddr, CompareAddr});
     } else {

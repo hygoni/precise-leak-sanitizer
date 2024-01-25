@@ -4,7 +4,6 @@
 #include "plsan_handler.h"
 #include "plsan_shadow.h"
 
-#include <initializer_list>
 #include <tuple>
 
 namespace __plsan {
