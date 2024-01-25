@@ -31,9 +31,51 @@ Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
   }
 }
 
-void PreciseLeakSanVisitor::visitCallInst(CallInst &I) { return; }
+void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
+  StringRef FuncName;
+  Function *CallFunc = I.getCalledFunction();
+  if (CallFunc)
+    FuncName = CallFunc->getName();
+  else
+    return;
 
-void PreciseLeakSanVisitor::visitCallMalloc(CallInst &I) { return; }
+  if (I.getType()->isPointerTy()) {
+    Value *RetAddr = &I;
+    Instruction *LastInst = InstructionTraceTopDown(&I);
+    IRBuilder<> Builder(LastInst);
+    if (StoreInst *Inst = dyn_cast<StoreInst>(LastInst)) {
+      Value *CompareAddr = Inst->getValueOperand();
+      Builder.CreateCall(Plsan.CheckReturnedOrStoredValueFn,
+                         {RetAddr, CompareAddr});
+    } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
+      Value *CompareAddr = Inst->getReturnValue();
+      Builder.CreateCall(Plsan.CheckReturnedOrStoredValueFn,
+                         {RetAddr, CompareAddr});
+    } else {
+      Builder.SetInsertPoint(I.getNextNode());
+      Builder.CreateCall(Plsan.CheckMemoryLeakFn, {RetAddr});
+    }
+  }
+
+  if (FuncName == "malloc")
+    visitCallMalloc(I);
+  if (FuncName == "free")
+    visitCallFree(I);
+  if (FuncName == "llvm.stacksave")
+    visitLLVMStacksave(I);
+  if (FuncName == "llvm.stackrestore")
+    visitLLVMStackrestore(I);
+}
+
+void PreciseLeakSanVisitor::visitCallMalloc(CallInst &I) {
+  IRBuilder<> Builder(&I);
+  Value *MallocSizeArg = I.getArgOperand(0);
+  Value *AlignedMallocSizeArg =
+      Builder.CreateCall(Plsan.AlignFn, {MallocSizeArg});
+  I.setArgOperand(0, AlignedMallocSizeArg);
+  Builder.SetInsertPoint(I.getNextNode());
+  Builder.CreateCall(Plsan.AllocFn, {&I, AlignedMallocSizeArg});
+}
 
 void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) { return; }
 
@@ -41,7 +83,12 @@ void PreciseLeakSanVisitor::visitCallNew(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitCallArrTyNew(CallInst &I) { return; }
 
-void PreciseLeakSanVisitor::visitCallFree(CallInst &I) { return; }
+void PreciseLeakSanVisitor::visitCallFree(CallInst &I) {
+  IRBuilder<> Builder(&I);
+  Value *FreeAddrArg = I.getArgOperand(0);
+  Builder.SetInsertPoint(I.getNextNode());
+  Builder.CreateCall(Plsan.FreeFn, {FreeAddrArg});
+}
 
 void PreciseLeakSanVisitor::visitCallMemset(CallInst &I) { return; }
 
