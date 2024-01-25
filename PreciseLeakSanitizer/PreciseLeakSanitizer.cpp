@@ -42,7 +42,10 @@ void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitCallBzero(CallInst &I) { return; }
 
-void PreciseLeakSanVisitor::visitLLVMStacksave(CallInst &I) { return; }
+void PreciseLeakSanVisitor::visitLLVMStacksave(CallInst &I) {
+  LocalPtrVarListStack.push(std::vector<Value *>());
+  LocalPtrArrListStack.push(std::vector<ArrayAddrInfo>());
+}
 
 void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) { return; }
 
@@ -92,20 +95,28 @@ bool PreciseLeakSanitizer::initializeModule() {
   return true;
 }
 
-void PreciseLeakSanVisitor::pushNewLocalPtrVarListStack() { return; }
+void PreciseLeakSanVisitor::pushNewLocalPtrVarListStack() {
+  LocalPtrVarListStack.push(std::vector<Value *>());
+}
 
-void PreciseLeakSanVisitor::pushNewLocalPtrArrListStack() { return; }
+void PreciseLeakSanVisitor::pushNewLocalPtrArrListStack() {
+  LocalPtrArrListStack.push(std::vector<ArrayAddrInfo>());
+}
 
 PreciseLeakSanitizer::PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx)
     : Mod(Mod), Ctx(Ctx) {}
 
 bool PreciseLeakSanitizer::run() {
   Plsan->initializeModule();
+  PreciseLeakSanVisitor visitor(*Plsan);
 
   for (Function &F : Mod) {
+    // Stack pointer saved, then push local variable stack.
+    visitor.pushNewLocalPtrVarListStack();
+    visitor.pushNewLocalPtrArrListStack();
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
-        PreciseLeakSanVisitor(*Plsan).visit(I);
+        visitor.visit(I);
       }
     }
   }
