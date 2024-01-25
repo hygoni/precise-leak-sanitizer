@@ -114,12 +114,44 @@ void Plsan::reference_count(void **lhs, void *rhs) {
 std::vector<void *> *
 Plsan::free_stack_variables(void *ret_addr, bool is_return,
                             std::vector<void **> var_addrs) {
-  return NULL;
+  std::vector<void *> *ref_count_zero_addrs = new std::vector<void *>();
+
+  for (void **var_addr : var_addrs) {
+    shadow->add_shadow(*var_addr, 1);
+    if (!is_return) {
+      RefCountAnalysis analysis_result = shadow->shadow_analysis(*var_addr);
+      if (std::get<1>(analysis_result) == RefCountZero)
+        ref_count_zero_addrs->push_back(*var_addr);
+    } else if (*var_addr != ret_addr)
+      check_memory_leak(*var_addr);
+  }
+
+  if (!is_return)
+    return ref_count_zero_addrs;
+  else
+    return nullptr;
 }
 
 std::vector<void *> *Plsan::free_stack_array(void **arr_addr, size_t size,
                                              void *ret_addr, bool is_return) {
-  return NULL;
+  std::vector<void *> *ref_count_zero_addrs = new std::vector<void *>();
+
+  for (int i = 0; i < size; i++) {
+    void *ptr_value = ptr_array_value(arr_addr, i);
+    shadow->add_shadow(ptr_value, 1);
+    if (!is_return) {
+      RefCountAnalysis analysis_result = shadow->shadow_analysis(ptr_value);
+      if (std::get<1>(analysis_result) == RefCountZero)
+        ref_count_zero_addrs->push_back(ptr_value);
+    } else if (ptr_value != ret_addr) {
+      check_memory_leak(ptr_value);
+    }
+  }
+
+  if (!is_return)
+    return ref_count_zero_addrs;
+  else
+    return nullptr;
 }
 
 void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
