@@ -19,7 +19,16 @@ void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) { return; }
 void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) { return; }
 
 Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
-  return NULL;
+  if (I->user_begin() == I->user_end()) {
+    return I;
+  } else {
+    auto UI = I->user_begin();
+    Value *user = *UI;
+    if (Instruction *userInst = dyn_cast<Instruction>(user)) {
+      return InstructionTraceTopDown(userInst);
+    }
+    return NULL;
+  }
 }
 
 void PreciseLeakSanVisitor::visitCallInst(CallInst &I) { return; }
