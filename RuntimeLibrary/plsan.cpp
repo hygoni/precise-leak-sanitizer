@@ -9,6 +9,11 @@
 
 __plsan::Plsan *plsan;
 
+namespace {
+using LazyCheckInfo = std::tuple</*RefCountZeroAddrs=*/std::vector<void *> *,
+                                 /*ProgramCounterAddr=*/void *>;
+}
+
 /* Initialization routines called before main() */
 __attribute__((constructor)) void __plsan_init() { /* TODO: */
   plsan = new __plsan::Plsan();
@@ -29,19 +34,29 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
 }
 
-extern "C" void
-__plsan_free_stack_variables(std::initializer_list<void *> var_addrs) {
-  plsan->free_stack_variables(var_addrs);
+extern "C" std::tuple<std::vector<void *> *, void *> *
+__plsan_free_stack_variables(size_t count, void *ret_addr, int is_return, ...) {
+  return NULL;
 }
 
-extern "C" void __plsan_free_stack_arrays(
-    std::initializer_list<std::tuple<void *, size_t>> arr_addrs_and_lens) {
-  plsan->free_stack_arrays(arr_addrs_and_lens);
+extern "C" std::tuple<std::vector<void *> *, void *> *
+__plsan_free_stack_array(void **arr_start_addr, size_t size, void *ret_addr,
+                         bool is_return) {
+  return NULL;
+}
+
+extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
+                                   void *ret_addr) {
+  return;
 }
 
 extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
                                                        void *compare_ptr_addr) {
   plsan->check_returned_or_stored_value(ret_ptr_addr, compare_ptr_addr);
+}
+
+extern "C" void __plsan_check_memory_leak(void *addr) {
+  plsan->check_memory_leak(addr);
 }
 
 namespace __plsan {
@@ -69,24 +84,15 @@ void Plsan::reference_count(void **lhs, void *rhs) {
   check_memory_leak(*lhs);
 }
 
-void Plsan::free_stack_variables(std::initializer_list<void *> var_addrs) {
-  for (void *var_addr : var_addrs) {
-    shadow->add_shadow(var_addr, 1);
-    check_memory_leak(var_addr);
-  }
+std::vector<void *> *
+Plsan::free_stack_variables(void *ret_addr, bool is_return,
+                            std::vector<void **> var_addrs) {
+  return NULL;
 }
 
-void Plsan::free_stack_arrays(
-    std::initializer_list<std::tuple<void *, size_t>> arr_addrs_and_lens) {
-  for (std::tuple<void *, size_t> arr_tuple : arr_addrs_and_lens) {
-    void *array_start_addr = std::get<0>(arr_tuple);
-    size_t size = std::get<1>(arr_tuple);
-    for (int i = 0; i < size; i++) {
-      void *ptr_value = ptr_array_value(array_start_addr, i);
-      shadow->add_shadow(ptr_value, 1);
-      check_memory_leak(ptr_value);
-    }
-  }
+std::vector<void *> *Plsan::free_stack_array(void **arr_addr, size_t size,
+                                             void *ret_addr, bool is_return) {
+  return NULL;
 }
 
 void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
