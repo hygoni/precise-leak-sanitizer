@@ -12,9 +12,31 @@ PreciseLeakSanitizer *Plsan;
 PreciseLeakSanVisitor::PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan)
     : Plsan(Plsan), LocalPtrVarListStack(), LocalPtrArrListStack() {}
 
-void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) { return; }
+void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
+  IRBuilder<> Builder(&I);
+  Type *AllocatedType = I.getAllocatedType();
+  bool IsPointerTy = AllocatedType->isPointerTy();
+  if (I.isArrayAllocation()) {
+    if (IsPointerTy) {
+      LocalPtrArrListStack.top().push_back(
+          std::make_tuple(&I, I.getArraySize()));
+    }
+  } else if (ArrayType *Arr = dyn_cast<ArrayType>(AllocatedType)) {
+    ConstantInt *ArrSize = Builder.getInt64(Arr->getNumElements());
+    LocalPtrArrListStack.top().push_back(std::make_tuple(&I, ArrSize));
+  } else if (IsPointerTy) {
+    LocalPtrVarListStack.top().push_back(&I);
+  }
+}
 
-void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) { return; }
+void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) {
+  Value *rhs = I.getValueOperand();
+  if (rhs->getType()->isPointerTy()) {
+    IRBuilder<> Builder(&I);
+    Value *lhs = I.getPointerOperand();
+    Builder.CreateCall(Plsan.StoreFn, {lhs, rhs});
+  }
+}
 
 void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) { return; }
 
