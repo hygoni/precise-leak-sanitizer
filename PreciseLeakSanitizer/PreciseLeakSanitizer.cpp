@@ -38,7 +38,43 @@ void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) {
   }
 }
 
-void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) { return; }
+void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
+  IRBuilder<> Builder(&I);
+  Value *ReturnValue = I.getReturnValue();
+  Value *TrueValue = ConstantInt::getTrue(Plsan.Ctx);
+
+  std::vector<Value *> TopLocalPtrVarList = LocalPtrVarListStack.top();
+  std::vector<ArrayAddrInfo> TopLocalPtrArrList = LocalPtrArrListStack.top();
+
+  // Call __plsan_lazy_check
+  while (!LazyCheckInfoStack.empty()) {
+    Builder.CreateCall(Plsan.LazyCheckFn,
+                       {LazyCheckInfoStack.top(), ReturnValue});
+    LazyCheckInfoStack.pop();
+  }
+
+  // Call __plsan_free_stack_variables
+  ConstantInt *VarCount = Builder.getInt64(TopLocalPtrVarList.size());
+  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), TrueValue);
+  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), ReturnValue);
+  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), VarCount);
+  ArrayRef<Value *> VarArgs = ArrayRef<Value *>(TopLocalPtrVarList);
+  Builder.CreateCall(Plsan.FreeStackVariablesFn, VarArgs);
+
+  // Stack pointer restored, then pop local variable stack.
+  LocalPtrVarListStack.pop();
+
+  // Call __plsan_free_stack_array, non-variable length array
+  for (ArrayAddrInfo ArrAddrAndSize : TopLocalPtrArrList) {
+    Value *ArrAddr = std::get<0>(ArrAddrAndSize);
+    Value *Size = std::get<1>(ArrAddrAndSize);
+    Builder.CreateCall(Plsan.FreeStackArrayFn,
+                       {ArrAddr, Size, ReturnValue, TrueValue});
+  }
+
+  // Stack pointer restored, then pop local variable stack.
+  LocalPtrArrListStack.pop();
+}
 
 Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
   if (I->user_begin() == I->user_end()) {
