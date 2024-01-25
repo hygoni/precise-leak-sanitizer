@@ -5,6 +5,7 @@
 
 #include "plsan.h"
 
+#include <cstdarg>
 #include <cstddef>
 
 __plsan::Plsan *plsan;
@@ -36,18 +37,44 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
 
 extern "C" std::tuple<std::vector<void *> *, void *> *
 __plsan_free_stack_variables(size_t count, void *ret_addr, int is_return, ...) {
-  return NULL;
+  // We cannot use C++ style variable arguments, because extern keyword for
+  // compatiable with C.
+
+  std::vector<void **> args;
+
+  va_list var_addrs;
+  va_start(var_addrs, is_return);
+
+  for (int i = 0; i < count; i++)
+    args.push_back(va_arg(var_addrs, void **));
+
+  va_end(var_addrs);
+
+  std::vector<void *> *ref_count_zero_addrs =
+      plsan->free_stack_variables(ret_addr, is_return, args);
+  return new std::tuple(ref_count_zero_addrs, __builtin_return_address(0));
 }
 
 extern "C" std::tuple<std::vector<void *> *, void *> *
 __plsan_free_stack_array(void **arr_start_addr, size_t size, void *ret_addr,
                          bool is_return) {
-  return NULL;
+  std::vector<void *> *ref_count_zero_addrs =
+      plsan->free_stack_array(arr_start_addr, size, ret_addr, is_return);
+  return new std::tuple(ref_count_zero_addrs, __builtin_return_address(0));
 }
 
 extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
                                    void *ret_addr) {
-  return;
+  std::vector<void *> *lazy_check_addr_list = std::get<0>(*lazy_check_info);
+  void *program_counter = std::get<1>(*lazy_check_info);
+
+  for (void *lazy_check_addr : *lazy_check_addr_list) {
+    if (lazy_check_addr != ret_addr)
+      throw ret_addr;
+  }
+
+  delete lazy_check_addr_list;
+  delete lazy_check_info;
 }
 
 extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
