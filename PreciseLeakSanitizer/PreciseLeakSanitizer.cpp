@@ -10,11 +10,17 @@ using namespace llvm;
 PreciseLeakSanitizer *Plsan;
 
 PreciseLeakSanVisitor::PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan)
-    : Plsan(Plsan) {}
+    : Plsan(Plsan), LocalPtrVarListStack(), LocalPtrArrListStack() {}
+
+void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) { return; }
+
+Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
+  return NULL;
+}
 
 void PreciseLeakSanVisitor::visitCallInst(CallInst &I) { return; }
 
@@ -36,12 +42,18 @@ void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitCallBzero(CallInst &I) { return; }
 
+void PreciseLeakSanVisitor::visitLLVMStacksave(CallInst &I) { return; }
+
+void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) { return; }
+
 bool PreciseLeakSanitizer::initializeModule() {
 
   VoidTy = Type::getVoidTy(Ctx);
   VoidPtrTy = PointerType::getUnqual(VoidTy);
   VoidPtrPtrTy = PointerType::getUnqual(VoidPtrTy);
+  Int32Ty = Type::getInt32Ty(Ctx);
   Int64Ty = Type::getInt64Ty(Ctx);
+  BoolTy = Type::getInt1Ty(Ctx);
 
   AlignFnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
   AlignFn = Mod.getOrInsertFunction(AlignFnName, AlignFnTy);
@@ -55,21 +67,34 @@ bool PreciseLeakSanitizer::initializeModule() {
   StoreFnTy = FunctionType::get(VoidTy, {VoidPtrPtrTy, VoidPtrTy}, false);
   StoreFn = Mod.getOrInsertFunction(StoreFnName, StoreFnTy);
 
-  FreeStackVariablesFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
+  FreeStackVariablesFnTy =
+      FunctionType::get(VoidPtrTy, {Int64Ty, VoidPtrTy, Int32Ty}, true);
   FreeStackVariablesFn =
       Mod.getOrInsertFunction(FreeStackVariablesFnName, FreeStackVariablesFnTy);
 
-  FreeStackArraysFnTy = FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty}, false);
-  FreeStackArraysFn =
-      Mod.getOrInsertFunction(FreeStackArraysFnName, FreeStackArraysFnTy);
+  FreeStackArrayFnTy = FunctionType::get(
+      VoidPtrTy, {VoidPtrPtrTy, Int64Ty, VoidPtrTy, BoolTy}, false);
+  FreeStackArrayFn =
+      Mod.getOrInsertFunction(FreeStackArrayFnName, FreeStackArrayFnTy);
+
+  LazyCheckFnTy = FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy}, false);
+  LazyCheckFn = Mod.getOrInsertFunction(LazyCheckFnName, LazyCheckFnTy);
 
   CheckReturnedOrStoredValueFnTy =
       FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy}, false);
   CheckReturnedOrStoredValueFn = Mod.getOrInsertFunction(
       CheckReturnedOrStoredValueFnName, CheckReturnedOrStoredValueFnTy);
 
+  CheckMemoryLeakFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
+  CheckMemoryLeakFn =
+      Mod.getOrInsertFunction(CheckMemoryLeakFnName, CheckMemoryLeakFnTy);
+
   return true;
 }
+
+void PreciseLeakSanVisitor::pushNewLocalPtrVarListStack() { return; }
+
+void PreciseLeakSanVisitor::pushNewLocalPtrArrListStack() { return; }
 
 PreciseLeakSanitizer::PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx)
     : Mod(Mod), Ctx(Ctx) {}
