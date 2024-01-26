@@ -225,9 +225,9 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
 }
 
 void Plsan::memcpy_refcnt(void *dest, void *src, size_t count) {
-  for (int i = 0; i < count; i++) {
-    void *src_i = plsan->ptr_array_value(src, i);
-    void *dest_i = plsan->ptr_array_value(dest, i);
+  for (int i = 0; i < count / 8; i++) {
+    void *src_i = plsan->ptr_array_value(src, i * 8);
+    void *dest_i = plsan->ptr_array_value(dest, i * 8);
     plsan->reference_count(&dest_i, src_i);
   }
 }
