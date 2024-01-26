@@ -16,17 +16,29 @@ PreciseLeakSanVisitor::PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan)
 void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
   IRBuilder<> Builder(&I);
   Type *AllocatedType = I.getAllocatedType();
+  Value *NullPtr = ConstantPointerNull::get(Plsan.VoidPtrTy);
   bool IsPointerTy = AllocatedType->isPointerTy();
+
+  Builder.SetInsertPoint(I.getNextNode());
+
   if (I.isArrayAllocation()) {
     if (IsPointerTy) {
       LocalPtrArrListStack.top().push_back(
           std::make_tuple(&I, I.getArraySize()));
+      CallInst *InstrumentedInst =
+          Builder.CreateMemSet(&I, NullPtr, I.getArraySize(), MaybeAlign());
+      InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
     }
   } else if (ArrayType *Arr = dyn_cast<ArrayType>(AllocatedType)) {
     ConstantInt *ArrSize = Builder.getInt64(Arr->getNumElements());
     LocalPtrArrListStack.top().push_back(std::make_tuple(&I, ArrSize));
+    CallInst *InstrumentedInst =
+        Builder.CreateMemSet(&I, NullPtr, ArrSize, MaybeAlign());
+    InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
   } else if (IsPointerTy) {
     LocalPtrVarListStack.top().push_back(&I);
+    StoreInst *InstrumentedInst = Builder.CreateStore(NullPtr, &I);
+    InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
   }
 }
 

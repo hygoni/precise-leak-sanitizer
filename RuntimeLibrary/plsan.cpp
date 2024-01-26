@@ -156,8 +156,9 @@ Plsan::free_stack_variables(void *ret_addr, bool is_return,
       RefCountAnalysis analysis_result = shadow->shadow_analysis(*var_addr);
       if (std::get<1>(analysis_result) == RefCountZero)
         ref_count_zero_addrs->push_back(*var_addr);
-    } else if (*var_addr != ret_addr)
+    } else if (*var_addr != ret_addr) {
       check_memory_leak(*var_addr);
+    }
   }
 
   if (!is_return)
