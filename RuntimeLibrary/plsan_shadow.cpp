@@ -18,7 +18,7 @@ PlsanShadow::~PlsanShadow() { munmap(shadow_addr, MMAP_SIZE); }
 
 void PlsanShadow::alloc_shadow(void *addr, size_t size) {
   ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
-  // Have never been initialized
+  // If address is not dynamic allocated memory
   if (*shadow_addr <= 0) {
     for (int i = 1; i < size / MIN_DYN_ALLOC_SIZE; i++)
       *(shadow_addr + i) = std::max(-i, -SHADOW_INIT_VALUE - 1);
@@ -28,6 +28,7 @@ void PlsanShadow::alloc_shadow(void *addr, size_t size) {
 
 void PlsanShadow::free_shadow(void *addr) {
   ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
+  // If address is dynamic allocated memory
   if (*shadow_addr > 0) {
     *shadow_addr = 0;
     while (*(++shadow_addr) < 0)
@@ -37,7 +38,7 @@ void PlsanShadow::free_shadow(void *addr) {
 
 void PlsanShadow::add_shadow(void *addr, int value) {
   ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
-  // Have been initialized
+  // If address is dynamic allocated memory
   if (*shadow_addr > 0) {
     *shadow_addr = std::min(*shadow_addr + value, SHADOW_INIT_VALUE);
   }
@@ -46,8 +47,8 @@ void PlsanShadow::add_shadow(void *addr, int value) {
 // Shadow class no need to know this logic, but remain this function for
 // convenience.
 void PlsanShadow::update_shadow(void *lhs, void *rhs) {
-  add_shadow(lhs, 1);  // decreasing ref count
-  add_shadow(rhs, -1); // increasing ref count
+  add_shadow(lhs, 1);  // Decreasing ref count
+  add_shadow(rhs, -1); // Increasing ref count
 }
 
 bool PlsanShadow::shadow_value_is_equal(void *a, void *b) {
@@ -60,8 +61,10 @@ RefCountAnalysis PlsanShadow::shadow_analysis(void *addr) {
   ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
   AddrType addr_type;
   ExceptionType exception_type;
+  // If address is dynamic allocated memory
   if (*shadow_addr > 0) {
     addr_type = DynAlloc;
+    // Address value equal to SHADOW_INIT_VALUE means ref count is 0.
     if (*shadow_addr == SHADOW_INIT_VALUE)
       exception_type = RefCountZero;
     else

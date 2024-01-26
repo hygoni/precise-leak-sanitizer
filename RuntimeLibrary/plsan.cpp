@@ -11,7 +11,7 @@ using LazyCheckInfo = std::tuple</*RefCountZeroAddrs=*/std::vector<void *> *,
 }
 
 /* Initialization routines called before main() */
-__attribute__((constructor)) void __plsan_init() { /* TODO: */
+__attribute__((constructor)) void __plsan_init() {
   plsan = new __plsan::Plsan();
 }
 
@@ -47,6 +47,9 @@ __plsan_free_stack_variables(size_t count, void *ret_addr, int is_return, ...) {
 
   std::vector<void *> *ref_count_zero_addrs =
       plsan->free_stack_variables(ret_addr, is_return, args);
+
+  // This return will be changed. It have to contain stack trace data.
+  // __builtin_return_address(0) will return program counter
   return new std::tuple(ref_count_zero_addrs, __builtin_return_address(0));
 }
 
@@ -55,6 +58,9 @@ __plsan_free_stack_array(void **arr_start_addr, size_t size, void *ret_addr,
                          bool is_return) {
   std::vector<void *> *ref_count_zero_addrs =
       plsan->free_stack_array(arr_start_addr, size, ret_addr, is_return);
+
+  // This return will be changed. It have to contain stack trace data.
+  // __builtin_return_address(0) will return program counter
   return new std::tuple(ref_count_zero_addrs, __builtin_return_address(0));
 }
 
@@ -98,6 +104,7 @@ Plsan::~Plsan() {
 }
 
 size_t Plsan::align_size(size_t size) {
+  // Align size with multiples of MIN_DYN_ALLOC_SIZE (defined in plsan_shadow.h)
   return (size + MIN_DYN_ALLOC_SIZE - 1) & ~(MIN_DYN_ALLOC_SIZE - 1);
 }
 
@@ -108,6 +115,11 @@ void Plsan::init_refcnt(void *addr, size_t size) {
 void Plsan::fini_refcnt(void *addr) { shadow->free_shadow(addr); }
 
 void Plsan::reference_count(void **lhs, void *rhs) {
+  // Ref count with Shadow class update_shadow method.
+  // When there is update in ref count, we should check there is any memory
+  // leak. update_shadow method only decrease lhs's ref count, no problem with
+  // checking only lhs.
+
   shadow->update_shadow(*lhs, rhs);
   check_memory_leak(*lhs);
 }
@@ -115,6 +127,20 @@ void Plsan::reference_count(void **lhs, void *rhs) {
 std::vector<void *> *
 Plsan::free_stack_variables(void *ret_addr, bool is_return,
                             std::vector<void **> var_addrs) {
+  // free_stack_variables method calls above return instruction or some method
+  // that pop(restore) stack.
+  // 1. If free_stack_variables calls above return instruction, then "is_return"
+  // arg is true and decrease stack variables ref count. We have to check memory 
+  //    leak in this case. If stack address is same with ret_addr, then do not 
+  //    check memory leak. (See Documentation 4.3.1)
+  // 2. If free_stack_variables calls above some method that restore stack, then
+  // "is_return" arg is false and decrease stack variables ref count. We do not 
+  //    check memory leak (lazy check). -> There is some cases that return 
+  //    restored stack value.
+  // "var_addrs" arg stores all stack variable addresses.
+  // If is_return is falsem, then this method return target address that check
+  // leak lazily.
+
   std::vector<void *> *ref_count_zero_addrs = new std::vector<void *>();
 
   for (void **var_addr : var_addrs) {
@@ -135,6 +161,10 @@ Plsan::free_stack_variables(void *ret_addr, bool is_return,
 
 std::vector<void *> *Plsan::free_stack_array(void **arr_addr, size_t size,
                                              void *ret_addr, bool is_return) {
+  // This method almost same with free_stack_variables method, but it is for
+  // arrays in stack. "arr_addr" arg has array start address "size" arg has
+  // array size
+
   std::vector<void *> *ref_count_zero_addrs = new std::vector<void *>();
 
   for (int i = 0; i < size; i++) {
@@ -157,6 +187,11 @@ std::vector<void *> *Plsan::free_stack_array(void **arr_addr, size_t size,
 
 void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
                                            void *compare_ptr_addr) {
+  // This method will be called after function call instruction and above store
+  // and return instruction. If some function call return pointer type value, we
+  // have to check if return pointer point dyn alloc memory and ref count is 0.
+  // For more information, see doumentation 4.3.1 When a function exits
+
   RefCountAnalysis analysis_result = shadow->shadow_analysis(ret_ptr_addr);
   // check address type
   if (std::get<0>(analysis_result) == NonDynAlloc) {
@@ -190,6 +225,7 @@ void Plsan::memcpy_refcnt(void *dest, void *src, size_t count) {
 }
 
 void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
+  // void * type cannot add with integer. So casting to int *.
   int64_t *array_addr = (int64_t *)array_start_addr;
   return (void *)(*(array_addr + index));
 }
