@@ -22,6 +22,9 @@ _FP=0
 _TN=0
 _FN=0
 
+_FP_TC_LIST=()
+_FN_TC_LIST=()
+
 #############################
 
 _count=0
@@ -74,6 +77,7 @@ for test_case in $test_cases; do
 
       if [[ $(check_actual_output "$test_case") == 1 ]]; then # is it no leak?
         ((_FP++))
+        _FP_TC_LIST+=("    - $test_case\n")
       else
         ((_TP++))
       fi
@@ -85,6 +89,7 @@ for test_case in $test_cases; do
         ((_TN++))
       else
         ((_FN++))
+        _FN_TC_LIST+=("    - $test_case\n")
       fi
     fi
   else
@@ -99,8 +104,14 @@ echo -e "\nTestcases: $total_files\n"
 
 echo "True Positive : $_TP"
 echo "False Positive : $_FP"
+for element in "${_FP_TC_LIST[@]}"; do
+    echo "$element"
+done
 echo "True Negative : $_TN"
 echo "False Negative : $_FN"
+for element in "${_FN_TC_LIST[@]}"; do
+    echo "$element"
+done
 
 if [ $_TP != $_actual_TP ]; then
   if [ $_FP != $_actual_FP ]; then
