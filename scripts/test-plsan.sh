@@ -46,15 +46,21 @@ for test_case in $test_cases; do
   # add count
   ((_count++))
 
+  compile_options="-fpass-plugin=build/PreciseLeakSanitizer/PreciseLeakSanitizer.so"
+  compile_options+=" -g -c -Wno-everything"
+  link_options=" -L build/RuntimeLibrary -lplsan -ldw"
   # setting up compile options.
   if [ "$file_extension" == "cpp" ]; then
-    compile_options="-fpass-plugin=`echo build/PreciseLeakSanitizer/PreciseLeakSanitizer.so` -lstdc++ -Wno-everything -g `echo build/RuntimeLibrary/libplsan.a`"
+    compiler=clang++
+    link_options+=" -lstdc++"
   else
-    compile_options="-fpass-plugin=`echo build/PreciseLeakSanitizer/PreciseLeakSanitizer.so` -Wno-everything -g build/RuntimeLibrary/libplsan.a" # -Wno-everything option is for developing!
+    compiler=clang
+    compile_options+=""
   fi
 
-  # compiling testcases
-  clang $compile_options $test_case -o $file_base_name
+  # compiling and link
+  $compiler $test_case $compile_options -o $file_base_name.o && \
+    clang++ ./$file_base_name.o $link_options -o $file_base_name
 
   # is compilation successed?
   if [ $? -eq 0 ]; then
@@ -85,7 +91,7 @@ for test_case in $test_cases; do
     echo "Compilation Failed : $test_case"
   fi
 
-  rm -f ./$file_base_name
+  rm -f ./$file_base_name ./$file_base_name.o
 done
 
 # Print results
