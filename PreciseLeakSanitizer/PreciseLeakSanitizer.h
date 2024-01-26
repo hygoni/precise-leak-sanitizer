@@ -1,6 +1,7 @@
 #ifndef PRECISE_LEAK_SANITIZER_H
 #define PRECISE_LEAK_SANITIZER_H
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
@@ -20,6 +21,10 @@ private:
 
   Module &Mod;
   LLVMContext &Ctx;
+
+  // PreciseLeakSanitizer instrumented metadata
+  StringRef PlsanMDName = "plsan.instrument";
+  MDNode *PlsanMD;
 
   // RT library functions
   Type *VoidTy;
@@ -61,6 +66,8 @@ private:
   StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
 
   bool initializeModule();
+  CallInst *CreateCallWithMetaData(IRBuilder<> &Builder, FunctionCallee Fn,
+                                   ArrayRef<Value *> Args);
 
 public:
   PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx);

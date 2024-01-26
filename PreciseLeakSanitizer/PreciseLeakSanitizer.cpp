@@ -1,6 +1,5 @@
 #include "PreciseLeakSanitizer.h"
 
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
@@ -36,7 +35,7 @@ void PreciseLeakSanVisitor::visitStoreInst(StoreInst &I) {
   if (rhs->getType()->isPointerTy()) {
     IRBuilder<> Builder(&I);
     Value *lhs = I.getPointerOperand();
-    Builder.CreateCall(Plsan.StoreFn, {lhs, rhs});
+    Plsan.CreateCallWithMetaData(Builder, Plsan.StoreFn, {lhs, rhs});
   }
 }
 
@@ -54,8 +53,8 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
 
   // Call __plsan_lazy_check
   while (!LazyCheckInfoStack.empty()) {
-    Builder.CreateCall(Plsan.LazyCheckFn,
-                       {LazyCheckInfoStack.top(), ReturnValue});
+    Plsan.CreateCallWithMetaData(Builder, Plsan.LazyCheckFn,
+                                 {LazyCheckInfoStack.top(), ReturnValue});
     LazyCheckInfoStack.pop();
   }
 
@@ -65,7 +64,7 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), ReturnValue);
   TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), VarCount);
   ArrayRef<Value *> VarArgs = ArrayRef<Value *>(TopLocalPtrVarList);
-  Builder.CreateCall(Plsan.FreeStackVariablesFn, VarArgs);
+  Plsan.CreateCallWithMetaData(Builder, Plsan.FreeStackVariablesFn, VarArgs);
 
   // Stack pointer restored, then pop local variable stack.
   LocalPtrVarListStack.pop();
@@ -74,8 +73,8 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   for (ArrayAddrInfo ArrAddrAndSize : TopLocalPtrArrList) {
     Value *ArrAddr = std::get<0>(ArrAddrAndSize);
     Value *Size = std::get<1>(ArrAddrAndSize);
-    Builder.CreateCall(Plsan.FreeStackArrayFn,
-                       {ArrAddr, Size, ReturnValue, TrueValue});
+    Plsan.CreateCallWithMetaData(Builder, Plsan.FreeStackArrayFn,
+                                 {ArrAddr, Size, ReturnValue, TrueValue});
   }
 
   // Stack pointer restored, then pop local variable stack.
@@ -103,34 +102,24 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
   else
     return;
 
-  if (FuncName == Plsan.AlignFnName || FuncName == Plsan.AllocFnName ||
-      FuncName == Plsan.FreeFnName || FuncName == Plsan.StoreFnName ||
-      FuncName == Plsan.FreeStackVariablesFnName ||
-      FuncName == Plsan.FreeStackArrayFnName ||
-      FuncName == Plsan.LazyCheckFnName ||
-      FuncName == Plsan.CheckReturnedOrStoredValueFnName ||
-      FuncName == Plsan.CheckMemoryLeakFnName ||
-      FuncName == Plsan.MemcpyRefcntFnName)
-    return;
-
   if (I.getType()->isPointerTy()) {
     Value *RetAddr = &I;
     Instruction *LastInst = InstructionTraceTopDown(&I);
     IRBuilder<> Builder(LastInst);
     if (StoreInst *Inst = dyn_cast<StoreInst>(LastInst)) {
       Value *CompareAddr = Inst->getValueOperand();
-      Builder.CreateCall(Plsan.CheckReturnedOrStoredValueFn,
-                         {RetAddr, CompareAddr});
+      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+                                   {RetAddr, CompareAddr});
     } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
       Value *CompareAddr = Inst->getReturnValue();
       // if return value is void
       if (CompareAddr == NULL)
         CompareAddr = ConstantPointerNull::get(Plsan.VoidPtrTy);
-      Builder.CreateCall(Plsan.CheckReturnedOrStoredValueFn,
-                         {RetAddr, CompareAddr});
+      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+                                   {RetAddr, CompareAddr});
     } else {
       Builder.SetInsertPoint(I.getNextNode());
-      Builder.CreateCall(Plsan.CheckMemoryLeakFn, {RetAddr});
+      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
     }
   }
 
@@ -153,10 +142,11 @@ void PreciseLeakSanVisitor::visitCallMalloc(CallInst &I) {
   IRBuilder<> Builder(&I);
   Value *MallocSizeArg = I.getArgOperand(0);
   Value *AlignedMallocSizeArg =
-      Builder.CreateCall(Plsan.AlignFn, {MallocSizeArg});
+      Plsan.CreateCallWithMetaData(Builder, Plsan.AlignFn, {MallocSizeArg});
   I.setArgOperand(0, AlignedMallocSizeArg);
   Builder.SetInsertPoint(I.getNextNode());
-  Builder.CreateCall(Plsan.AllocFn, {&I, AlignedMallocSizeArg});
+  Plsan.CreateCallWithMetaData(Builder, Plsan.AllocFn,
+                               {&I, AlignedMallocSizeArg});
 }
 
 void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) {
@@ -166,11 +156,13 @@ void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) {
   Value *AllocSize = Builder.CreateMul(CallocNumArg, CallocSizeArg);
   ConstantInt *AlignedCallocNumArg =
       ConstantInt::get(Type::getInt64Ty(Plsan.Ctx), 1);
-  Value *AlignedCallocSizeArg = Builder.CreateCall(Plsan.AlignFn, {AllocSize});
+  Value *AlignedCallocSizeArg =
+      Plsan.CreateCallWithMetaData(Builder, Plsan.AlignFn, {AllocSize});
   I.setArgOperand(0, AlignedCallocNumArg);
   I.setArgOperand(1, AlignedCallocSizeArg);
   Builder.SetInsertPoint(I.getNextNode());
-  Builder.CreateCall(Plsan.AllocFn, {&I, AlignedCallocSizeArg});
+  Plsan.CreateCallWithMetaData(Builder, Plsan.AllocFn,
+                               {&I, AlignedCallocSizeArg});
 }
 
 void PreciseLeakSanVisitor::visitCallNew(CallInst &I) { return; }
@@ -181,7 +173,7 @@ void PreciseLeakSanVisitor::visitCallFree(CallInst &I) {
   IRBuilder<> Builder(&I);
   Value *FreeAddrArg = I.getArgOperand(0);
   Builder.SetInsertPoint(I.getNextNode());
-  Builder.CreateCall(Plsan.FreeFn, {FreeAddrArg});
+  Plsan.CreateCallWithMetaData(Builder, Plsan.FreeFn, {FreeAddrArg});
 }
 
 void PreciseLeakSanVisitor::visitCallMemset(CallInst &I) { return; }
@@ -191,8 +183,9 @@ void PreciseLeakSanVisitor::visitCallMemcpy(CallInst &I) {
   Value *MemcpyDestPtrArg = I.getArgOperand(0);
   Value *MemcpySrcPtrArg = I.getArgOperand(1);
   Value *MemcpyCountArg = I.getArgOperand(2);
-  Builder.CreateCall(Plsan.MemcpyRefcntFn,
-                     {MemcpyDestPtrArg, MemcpySrcPtrArg, MemcpyCountArg});
+  Plsan.CreateCallWithMetaData(
+      Builder, Plsan.MemcpyRefcntFn,
+      {MemcpyDestPtrArg, MemcpySrcPtrArg, MemcpyCountArg});
 }
 
 void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
@@ -219,8 +212,8 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
   TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), NullPtr);
   TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), VarCount);
   ArrayRef<Value *> VarArgs = ArrayRef<Value *>(TopLocalPtrVarList);
-  CallInst *FreeStackVariablesFnCall =
-      Builder.CreateCall(Plsan.FreeStackVariablesFn, VarArgs);
+  CallInst *FreeStackVariablesFnCall = Plsan.CreateCallWithMetaData(
+      Builder, Plsan.FreeStackVariablesFn, VarArgs);
   LazyCheckInfoStack.push(FreeStackVariablesFnCall);
 
   // Stack pointer restored, then pop local variable stack.
@@ -229,8 +222,8 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
   for (ArrayAddrInfo ArrAddrAndSize : TopLocalPtrArrList) {
     Value *ArrAddr = std::get<0>(ArrAddrAndSize);
     Value *Size = std::get<1>(ArrAddrAndSize);
-    CallInst *FreeStackArrayFnCall = Builder.CreateCall(
-        Plsan.FreeStackArrayFn, {ArrAddr, Size, NullPtr, FalseValue});
+    CallInst *FreeStackArrayFnCall = Plsan.CreateCallWithMetaData(
+        Builder, Plsan.FreeStackArrayFn, {ArrAddr, Size, NullPtr, FalseValue});
     LazyCheckInfoStack.push(FreeStackArrayFnCall);
   }
 
@@ -239,6 +232,8 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
 }
 
 bool PreciseLeakSanitizer::initializeModule() {
+
+  PlsanMD = MDNode::get(Ctx, MDString::get(Ctx, "instrumented by plsan"));
 
   VoidTy = Type::getVoidTy(Ctx);
   VoidPtrTy = PointerType::getUnqual(VoidTy);
@@ -310,11 +305,21 @@ bool PreciseLeakSanitizer::run() {
     visitor.pushNewLocalPtrArrListStack();
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
+        if (I.getMetadata(Plsan->PlsanMDName))
+          continue;
         visitor.visit(I);
       }
     }
   }
   return false;
+}
+
+CallInst *PreciseLeakSanitizer::CreateCallWithMetaData(IRBuilder<> &Builder,
+                                                       FunctionCallee Fn,
+                                                       ArrayRef<Value *> Args) {
+  CallInst *InstrumentedInst = Builder.CreateCall(Fn, Args);
+  InstrumentedInst->setMetadata(PlsanMDName, PlsanMD);
+  return InstrumentedInst;
 }
 
 PreservedAnalyses PreciseLeakSanitizerPass::run(Module &M,
