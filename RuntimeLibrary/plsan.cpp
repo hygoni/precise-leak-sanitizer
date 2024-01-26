@@ -1,8 +1,3 @@
-/* READ THIS:
- * The name of a function here must start with double underscores to avoid
- * collisons with the program. For example: __foo(), __bar(), etc.
- */
-
 #include "plsan.h"
 
 #include <cstdarg>
@@ -102,7 +97,9 @@ Plsan::~Plsan() {
   delete handler;
 }
 
-size_t Plsan::align_size(size_t size) { return (size + 15) & ~15; }
+size_t Plsan::align_size(size_t size) {
+  return (size + MIN_DYN_ALLOC_SIZE - 1) & ~(MIN_DYN_ALLOC_SIZE - 1);
+}
 
 void Plsan::init_refcnt(void *addr, size_t size) {
   shadow->alloc_shadow(addr, size);
