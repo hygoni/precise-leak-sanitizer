@@ -1,5 +1,4 @@
 #include <stdlib.h>
-
 // interesting case
 // ASan can't detect memory leak in this case
 // it looks weird,,, ;(

@@ -2,10 +2,9 @@
 
 int main(void) {
   void *ptr = malloc(sizeof(void *));
-  void *ptr2 = malloc(sizeof(void *));
+  void *ptr2 = NULL;
 
-  memmove(ptr2, ptr, sizeof(void *));
+  memmove(&ptr2, &ptr, sizeof(void *));
 
-  free(ptr);  // free() source!
   free(ptr2); // free() destination!
 }
