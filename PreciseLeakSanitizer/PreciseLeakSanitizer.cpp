@@ -133,6 +133,8 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
 
   if (FuncName == "malloc")
     visitCallMalloc(I);
+  if (FuncName == "calloc")
+    visitCallCalloc(I);
   if (FuncName == "free")
     visitCallFree(I);
   if (FuncName == "llvm.stacksave")
@@ -151,7 +153,19 @@ void PreciseLeakSanVisitor::visitCallMalloc(CallInst &I) {
   Builder.CreateCall(Plsan.AllocFn, {&I, AlignedMallocSizeArg});
 }
 
-void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) { return; }
+void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) {
+  IRBuilder<> Builder(&I);
+  Value *CallocNumArg = I.getArgOperand(0);
+  Value *CallocSizeArg = I.getArgOperand(1);
+  Value *AllocSize = Builder.CreateMul(CallocNumArg, CallocSizeArg);
+  ConstantInt *AlignedCallocNumArg =
+      ConstantInt::get(Type::getInt64Ty(Plsan.Ctx), 1);
+  Value *AlignedCallocSizeArg = Builder.CreateCall(Plsan.AlignFn, {AllocSize});
+  I.setArgOperand(0, AlignedCallocNumArg);
+  I.setArgOperand(1, AlignedCallocSizeArg);
+  Builder.SetInsertPoint(I.getNextNode());
+  Builder.CreateCall(Plsan.AllocFn, {&I, AlignedCallocSizeArg});
+}
 
 void PreciseLeakSanVisitor::visitCallNew(CallInst &I) { return; }
 
