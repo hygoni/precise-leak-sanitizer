@@ -101,6 +101,15 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
   else
     return;
 
+  if (FuncName == Plsan.AlignFnName || FuncName == Plsan.AllocFnName ||
+      FuncName == Plsan.FreeFnName || FuncName == Plsan.StoreFnName ||
+      FuncName == Plsan.FreeStackVariablesFnName ||
+      FuncName == Plsan.FreeStackArrayFnName ||
+      FuncName == Plsan.LazyCheckFnName ||
+      FuncName == Plsan.CheckReturnedOrStoredValueFnName ||
+      FuncName == Plsan.CheckMemoryLeakFnName)
+    return;
+
   if (I.getType()->isPointerTy()) {
     Value *RetAddr = &I;
     Instruction *LastInst = InstructionTraceTopDown(&I);
