@@ -2,6 +2,7 @@
 
 #include <cstdarg>
 #include <cstddef>
+#include <cstring>
 
 __plsan::Plsan *plsan;
 
@@ -109,6 +110,12 @@ size_t Plsan::align_size(size_t size) {
 }
 
 void Plsan::init_refcnt(void *addr, size_t size) {
+  // Initialize not only shadow memory but dynamic allocated memory.
+  // https://github.com/hygoni/precise-leak-sanitizer/issues/29
+
+  int8_t initialize_value = '\0';
+  memset(addr, initialize_value, size);
+
   shadow->alloc_shadow(addr, size);
 }
 
@@ -130,12 +137,12 @@ Plsan::free_stack_variables(void *ret_addr, bool is_return,
   // free_stack_variables method calls above return instruction or some method
   // that pop(restore) stack.
   // 1. If free_stack_variables calls above return instruction, then "is_return"
-  // arg is true and decrease stack variables ref count. We have to check memory 
-  //    leak in this case. If stack address is same with ret_addr, then do not 
-  //    check memory leak. (See Documentation 4.3.1)
+  //    arg is true and decrease stack variables ref count. We have to check
+  //    memory leak in this case. If stack address is same with ret_addr, then
+  //    do not check memory leak. (See Documentation 4.3.1)
   // 2. If free_stack_variables calls above some method that restore stack, then
-  // "is_return" arg is false and decrease stack variables ref count. We do not 
-  //    check memory leak (lazy check). -> There is some cases that return 
+  //    "is_return" arg is false and decrease stack variables ref count. We do
+  //    not check memory leak (lazy check). -> There is some cases that return
   //    restored stack value.
   // "var_addrs" arg stores all stack variable addresses.
   // If is_return is falsem, then this method return target address that check
