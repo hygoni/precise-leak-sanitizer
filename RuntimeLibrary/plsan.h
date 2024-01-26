@@ -26,6 +26,7 @@ public:
                                       void *compare_ptr_addr);
   void check_memory_leak(void *addr);
   void check_memory_leak(RefCountAnalysis analysis_result);
+  void memcpy_refcnt(void *dest, void *src, size_t count);
 
 private:
   PlsanShadow *shadow;

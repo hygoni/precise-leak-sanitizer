@@ -86,6 +86,10 @@ extern "C" void __plsan_check_memory_leak(void *addr) {
   plsan->check_memory_leak(addr);
 }
 
+extern "C" void __plsan_memcpy_refcnt(void *dest, void *src, size_t count) {
+  plsan->memcpy_refcnt(dest, src, count);
+}
+
 namespace __plsan {
 
 Plsan::Plsan() {
@@ -177,6 +181,14 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   // check exception type
   if (std::get<1>(analysis_result) == RefCountZero) {
     handler->exception_check(analysis_result);
+  }
+}
+
+void Plsan::memcpy_refcnt(void *dest, void *src, size_t count) {
+  for (int i = 0; i < count; i++) {
+    void *src_i = plsan->ptr_array_value(src, i);
+    void *dest_i = plsan->ptr_array_value(dest, i);
+    plsan->reference_count(&dest_i, src_i);
   }
 }
 

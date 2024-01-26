@@ -37,6 +37,7 @@ private:
   FunctionType *LazyCheckFnTy;
   FunctionType *CheckReturnedOrStoredValueFnTy;
   FunctionType *CheckMemoryLeakFnTy;
+  FunctionType *MemcpyRefcntFnTy;
   FunctionCallee AlignFn;
   FunctionCallee AllocFn;
   FunctionCallee FreeFn;
@@ -46,6 +47,7 @@ private:
   FunctionCallee LazyCheckFn;
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
+  FunctionCallee MemcpyRefcntFn;
   StringRef AlignFnName = "__plsan_align";
   StringRef AllocFnName = "__plsan_alloc";
   StringRef FreeFnName = "__plsan_free";
@@ -56,6 +58,7 @@ private:
   StringRef CheckReturnedOrStoredValueFnName =
       "__plsan_check_returned_or_stored_value";
   StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
+  StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
 
   bool initializeModule();
 

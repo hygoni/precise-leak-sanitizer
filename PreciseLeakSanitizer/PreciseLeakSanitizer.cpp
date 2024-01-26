@@ -5,6 +5,8 @@
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
+#include <regex>
+
 using namespace llvm;
 
 PreciseLeakSanitizer *Plsan;
@@ -107,7 +109,8 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
       FuncName == Plsan.FreeStackArrayFnName ||
       FuncName == Plsan.LazyCheckFnName ||
       FuncName == Plsan.CheckReturnedOrStoredValueFnName ||
-      FuncName == Plsan.CheckMemoryLeakFnName)
+      FuncName == Plsan.CheckMemoryLeakFnName ||
+      FuncName == Plsan.MemcpyRefcntFnName)
     return;
 
   if (I.getType()->isPointerTy()) {
@@ -135,6 +138,9 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
     visitCallMalloc(I);
   if (FuncName == "calloc")
     visitCallCalloc(I);
+  if (std::regex_match(FuncName.str(),
+                       std::regex("^llvm\\.memcpy\\.[a-zA-Z0-9\\.\\*]*")))
+    visitCallMemcpy(I);
   if (FuncName == "free")
     visitCallFree(I);
   if (FuncName == "llvm.stacksave")
@@ -180,7 +186,14 @@ void PreciseLeakSanVisitor::visitCallFree(CallInst &I) {
 
 void PreciseLeakSanVisitor::visitCallMemset(CallInst &I) { return; }
 
-void PreciseLeakSanVisitor::visitCallMemcpy(CallInst &I) { return; }
+void PreciseLeakSanVisitor::visitCallMemcpy(CallInst &I) {
+  IRBuilder<> Builder(&I);
+  Value *MemcpyDestPtrArg = I.getArgOperand(0);
+  Value *MemcpySrcPtrArg = I.getArgOperand(1);
+  Value *MemcpyCountArg = I.getArgOperand(2);
+  Builder.CreateCall(Plsan.MemcpyRefcntFn,
+                     {MemcpyDestPtrArg, MemcpySrcPtrArg, MemcpyCountArg});
+}
 
 void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 
@@ -267,6 +280,11 @@ bool PreciseLeakSanitizer::initializeModule() {
   CheckMemoryLeakFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   CheckMemoryLeakFn =
       Mod.getOrInsertFunction(CheckMemoryLeakFnName, CheckMemoryLeakFnTy);
+
+  MemcpyRefcntFnTy =
+      FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
+  MemcpyRefcntFn =
+      Mod.getOrInsertFunction(MemcpyRefcntFnName, MemcpyRefcntFnTy);
 
   return true;
 }
