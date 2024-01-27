@@ -177,6 +177,14 @@ void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) {
                                {&I, AlignedCallocSizeArg});
 }
 
+void PreciseLeakSanVisitor::visitCallRealloc(CallInst &I) {
+  IRBuilder<> Builder(&I);
+  Value *ReallocOriginPtrArg = I.getArgOperand(0);
+  Builder.SetInsertPoint(I.getNextNode());
+  Plsan.CreateCallWithMetaData(Builder, Plsan.ReallocInstrumentFn,
+                               {ReallocOriginPtrArg, &I});
+}
+
 void PreciseLeakSanVisitor::visitCallNew(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitCallArrTyNew(CallInst &I) { return; }
@@ -292,6 +300,11 @@ bool PreciseLeakSanitizer::initializeModule() {
       FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
   MemcpyRefcntFn =
       Mod.getOrInsertFunction(MemcpyRefcntFnName, MemcpyRefcntFnTy);
+
+  ReallocInstrumentFnTy =
+      FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy}, false);
+  ReallocInstrumentFn =
+      Mod.getOrInsertFunction(ReallocInstrumentFnName, ReallocInstrumentFnTy);
 
   return true;
 }

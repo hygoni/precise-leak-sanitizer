@@ -43,6 +43,7 @@ private:
   FunctionType *CheckReturnedOrStoredValueFnTy;
   FunctionType *CheckMemoryLeakFnTy;
   FunctionType *MemcpyRefcntFnTy;
+  FunctionType *ReallocInstrumentFnTy;
   FunctionCallee AlignFn;
   FunctionCallee AllocFn;
   FunctionCallee FreeFn;
@@ -53,6 +54,7 @@ private:
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
   FunctionCallee MemcpyRefcntFn;
+  FunctionCallee ReallocInstrumentFn;
   StringRef AlignFnName = "__plsan_align";
   StringRef AllocFnName = "__plsan_alloc";
   StringRef FreeFnName = "__plsan_free";
@@ -64,6 +66,7 @@ private:
       "__plsan_check_returned_or_stored_value";
   StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
   StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
+  StringRef ReallocInstrumentFnName = "__plsan_realloc_instrument";
 
   bool initializeModule();
   CallInst *CreateCallWithMetaData(IRBuilder<> &Builder, FunctionCallee Fn,
@@ -92,6 +95,7 @@ private:
   Instruction *InstructionTraceTopDown(Instruction *I);
   void visitCallMalloc(CallInst &I);
   void visitCallCalloc(CallInst &I);
+  void visitCallRealloc(CallInst &I);
   void visitCallNew(CallInst &I);
   void visitCallArrTyNew(CallInst &I);
   void visitCallFree(CallInst &I);

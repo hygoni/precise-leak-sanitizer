@@ -92,6 +92,11 @@ extern "C" void __plsan_memcpy_refcnt(void *dest, void *src, size_t count) {
   plsan->memcpy_refcnt(dest, src, count);
 }
 
+extern "C" void __plsan_realloc_instrument(void *origin_addr,
+                                           void *realloc_addr) {
+  plsan->realloc_instrument(origin_addr, realloc_addr);
+}
+
 namespace __plsan {
 
 Plsan::Plsan() {
@@ -230,6 +235,11 @@ void Plsan::memcpy_refcnt(void *dest, void *src, size_t count) {
     void *dest_i = plsan->ptr_array_value(dest, i * 8);
     plsan->reference_count(&dest_i, src_i);
   }
+}
+
+void Plsan::realloc_instrument(void *origin_addr, void *realloc_addr) {
+  if (origin_addr != realloc_addr)
+    plsan->fini_refcnt(origin_addr);
 }
 
 void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
