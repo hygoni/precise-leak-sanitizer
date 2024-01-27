@@ -1,45 +1,101 @@
 #ifndef PRECISE_LEAK_SANITIZER_H
 #define PRECISE_LEAK_SANITIZER_H
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
+#include <stack>
+#include <tuple>
+#include <vector>
+
 using namespace llvm;
+
+using ArrayAddrInfo =
+    std::tuple</*ArrayStartPointer=*/Value *, /*ArraySize*/ Value *>;
 
 class PreciseLeakSanitizer {
 private:
   friend class PreciseLeakSanVisitor;
 
-  Module *Mod;
-  LLVMContext *Ctx;
+  Module &Mod;
+  LLVMContext &Ctx;
+
+  // PreciseLeakSanitizer instrumented metadata
+  StringRef PlsanMDName = "plsan.instrument";
+  MDNode *PlsanMD;
 
   // RT library functions
-  FunctionType *RefCountFnTy;
-  FunctionType *AllocSizeAlignFnTy;
-  FunctionType *InitDynAllocShadowMemFnTy;
-  FunctionCallee RefCountFn;
-  FunctionCallee AllocSizeAlignFn;
-  FunctionCallee InitDynAllocShadowMemFn;
-  StringRef RefCountFnName = "refCount";
-  StringRef AllocSizeAlignFnName = "allocSizeAlign";
-  StringRef InitDynAllocShadowMemFnName = "initDynAllocShadowMem";
+  Type *VoidTy;
+  Type *BoolTy;
+  PointerType *VoidPtrTy;
+  PointerType *VoidPtrPtrTy;
+  IntegerType *Int32Ty;
+  IntegerType *Int64Ty;
+  FunctionType *AlignFnTy;
+  FunctionType *AllocFnTy;
+  FunctionType *FreeFnTy;
+  FunctionType *StoreFnTy;
+  FunctionType *FreeStackVariablesFnTy;
+  FunctionType *FreeStackArrayFnTy;
+  FunctionType *LazyCheckFnTy;
+  FunctionType *CheckReturnedOrStoredValueFnTy;
+  FunctionType *CheckMemoryLeakFnTy;
+  FunctionType *MemcpyRefcntFnTy;
+  FunctionType *ReallocInstrumentFnTy;
+  FunctionCallee AlignFn;
+  FunctionCallee AllocFn;
+  FunctionCallee FreeFn;
+  FunctionCallee StoreFn;
+  FunctionCallee FreeStackVariablesFn;
+  FunctionCallee FreeStackArrayFn;
+  FunctionCallee LazyCheckFn;
+  FunctionCallee CheckReturnedOrStoredValueFn;
+  FunctionCallee CheckMemoryLeakFn;
+  FunctionCallee MemcpyRefcntFn;
+  FunctionCallee ReallocInstrumentFn;
+  StringRef AlignFnName = "__plsan_align";
+  StringRef AllocFnName = "__plsan_alloc";
+  StringRef FreeFnName = "__plsan_free";
+  StringRef StoreFnName = "__plsan_store";
+  StringRef FreeStackVariablesFnName = "__plsan_free_stack_variables";
+  StringRef FreeStackArrayFnName = "__plsan_free_stack_array";
+  StringRef LazyCheckFnName = "__plsan_lazy_check";
+  StringRef CheckReturnedOrStoredValueFnName =
+      "__plsan_check_returned_or_stored_value";
+  StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
+  StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
+  StringRef ReallocInstrumentFnName = "__plsan_realloc_instrument";
 
-  bool initializeModule(Module &M);
+  bool initializeModule();
+  CallInst *CreateCallWithMetaData(IRBuilder<> &Builder, FunctionCallee Fn,
+                                   ArrayRef<Value *> Args);
 
 public:
-  bool run(Module &M);
+  PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx);
+  bool run();
 };
 
 class PreciseLeakSanVisitor : public InstVisitor<PreciseLeakSanVisitor> {
 public:
+  PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan);
+  void visitAllocaInst(AllocaInst &I);
   void visitStoreInst(StoreInst &I);
   void visitReturnInst(ReturnInst &I);
   void visitCallInst(CallInst &I);
+  void pushNewLocalPtrVarListStack();
+  void pushNewLocalPtrArrListStack();
 
 private:
+  PreciseLeakSanitizer &Plsan;
+  std::stack<std::vector<Value *>> LocalPtrVarListStack;
+  std::stack<std::vector<ArrayAddrInfo>> LocalPtrArrListStack;
+  std::stack<CallInst *> LazyCheckInfoStack;
+  Instruction *InstructionTraceTopDown(Instruction *I);
   void visitCallMalloc(CallInst &I);
   void visitCallCalloc(CallInst &I);
+  void visitCallRealloc(CallInst &I);
   void visitCallNew(CallInst &I);
   void visitCallArrTyNew(CallInst &I);
   void visitCallFree(CallInst &I);
@@ -47,6 +103,8 @@ private:
   void visitCallMemcpy(CallInst &I);
   void visitCallMemmove(CallInst &I);
   void visitCallBzero(CallInst &I);
+  void visitLLVMStacksave(CallInst &I);
+  void visitLLVMStackrestore(CallInst &I);
 };
 
 struct PreciseLeakSanitizerPass

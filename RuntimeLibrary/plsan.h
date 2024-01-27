@@ -3,22 +3,36 @@
 
 #include "plsan_handler.h"
 #include "plsan_shadow.h"
-#include "plsan_storage.h"
+
+#include <tuple>
 
 namespace __plsan {
 
 class Plsan {
 public:
   Plsan();
-  // long align_size(long size);
+  ~Plsan();
 
-  void enter_func();
-  void exit_func();
+  // Instrumentation function
+  size_t align_size(size_t size);
+  void init_refcnt(void *addr, size_t size);
+  void fini_refcnt(void *addr);
+  void reference_count(void **lhs, void *rhs);
+  std::vector<void *> *free_stack_variables(void *ret_addr, bool is_return,
+                                            std::vector<void **> var_addrs);
+  std::vector<void *> *free_stack_array(void **arr_addr, size_t size,
+                                        void *ret_addr, bool is_return);
+  void check_returned_or_stored_value(void *ret_ptr_addr,
+                                      void *compare_ptr_addr);
+  void check_memory_leak(void *addr);
+  void check_memory_leak(RefCountAnalysis analysis_result);
+  void memcpy_refcnt(void *dest, void *src, size_t count);
+  void realloc_instrument(void *origin_addr, void *realloc_addr);
 
 private:
   PlsanShadow *shadow;
-  PlsanStorage *storage;
   PlsanHandler *handler;
+  void *ptr_array_value(void *array_start_addr, size_t index);
 };
 
 } // namespace __plsan
