@@ -5,5 +5,8 @@ mkdir build
 cd build
 
 # 2. Build
-cmake ..
+cmake -DLLVM_ENABLE_PROJECTS="llvm;clang;compiler-rt" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -G "Unix Makefiles" \
+        ../llvm
 make -j$(nproc)
