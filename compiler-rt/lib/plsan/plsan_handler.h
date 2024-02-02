@@ -15,7 +15,7 @@ enum ExceptionType { None, RefCountZero };
 
 struct RefCountAnalysis {
   AddrType addrTy;
-  ExceptionType ExceptTy;
+  ExceptionType exceptTy;
 };
 
 class PlsanHandler {
