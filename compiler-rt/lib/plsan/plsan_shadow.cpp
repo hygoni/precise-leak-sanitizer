@@ -1,6 +1,5 @@
 #include "plsan_shadow.h"
 
-#include <algorithm>
 #include <sys/mman.h>
 
 namespace __plsan {
@@ -21,7 +20,10 @@ void PlsanShadow::alloc_shadow(void *addr, size_t size) {
   // If address is not dynamic allocated memory
   if (*shadow_addr <= 0) {
     for (int i = 1; i < size / MIN_DYN_ALLOC_SIZE; i++)
-      *(shadow_addr + i) = std::max(-i, -SHADOW_INIT_VALUE - 1);
+      if (-i > -SHADOW_INIT_VALUE - 1)
+        *(shadow_addr + i) = -i;
+      else
+        *(shadow_addr + i) = -SHADOW_INIT_VALUE - 1;
   }
   *shadow_addr = SHADOW_INIT_VALUE;
 }
@@ -40,7 +42,10 @@ void PlsanShadow::add_shadow(void *addr, int value) {
   ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
   // If address is dynamic allocated memory
   if (*shadow_addr > 0) {
-    *shadow_addr = std::min(*shadow_addr + value, SHADOW_INIT_VALUE);
+    if (*shadow_addr + value < SHADOW_INIT_VALUE)
+      *shadow_addr = *shadow_addr + value;
+    else
+      *shadow_addr = SHADOW_INIT_VALUE;
   }
 }
 
@@ -74,7 +79,7 @@ RefCountAnalysis PlsanShadow::shadow_analysis(void *addr) {
     exception_type = None;
   }
 
-  RefCountAnalysis result = std::make_tuple(addr_type, exception_type);
+  RefCountAnalysis result = {addr_type, exception_type};
   return result;
 }
 

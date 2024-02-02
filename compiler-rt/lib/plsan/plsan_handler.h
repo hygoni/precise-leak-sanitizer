@@ -1,8 +1,7 @@
 #ifndef PLSAN_HANDLER_H
 #define PLSAN_HANDLER_H
 
-#include <iostream>
-#include <tuple>
+#include "lsan/lsan_common.h"
 
 #include "lib/backward.h"
 
@@ -14,7 +13,10 @@ enum AddrType { NonDynAlloc, DynAlloc };
 enum ExceptionType { None, RefCountZero };
 // Something stack trace data structure here.
 
-using RefCountAnalysis = std::tuple<AddrType, ExceptionType /*, StackTrace*/>;
+struct RefCountAnalysis {
+  AddrType addrTy;
+  ExceptionType ExceptTy;
+};
 
 class PlsanHandler {
 public:
