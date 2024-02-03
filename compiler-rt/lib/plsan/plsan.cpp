@@ -81,7 +81,7 @@ extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
   void *program_counter = lazy_check_info->ProgramCounterAddr;
 
   for (int i = 0; i < lazy_check_addr_list->Size(); i++) {
-    if (&lazy_check_addr_list[i] != ret_addr)
+    if ((*lazy_check_addr_list)[i] != ret_addr)
       throw ret_addr;
   }
 
