@@ -2,10 +2,11 @@
 #define PLSAN_HANDLER_H
 
 #include "lsan/lsan_common.h"
+#include <stdint.h>
 
-#include "lib/backward.h"
+// #include "lib/backward.h"
 
-using namespace backward;
+// using namespace backward;
 
 namespace __plsan {
 
@@ -21,8 +22,8 @@ struct RefCountAnalysis {
 class PlsanHandler {
 public:
   void exception_check(RefCountAnalysis ref_count_analysis);
-  void print_stack_trace(void *alloc_addr, size_t alloc_size, std::ostream &os);
-  void stack_trace(void *addr, std::ostream &os);
+  // void print_stack_trace(void *alloc_addr, size_t alloc_size, std::ostream
+  // &os); void stack_trace(void *addr, std::ostream &os);
 };
 
 } // namespace __plsan
