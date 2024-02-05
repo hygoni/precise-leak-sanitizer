@@ -4,8 +4,6 @@
 #include "plsan_handler.h"
 #include "plsan_shadow.h"
 
-#include <tuple>
-
 namespace __plsan {
 
 class Plsan {
@@ -18,10 +16,11 @@ public:
   void init_refcnt(void *addr, size_t size);
   void fini_refcnt(void *addr);
   void reference_count(void **lhs, void *rhs);
-  std::vector<void *> *free_stack_variables(void *ret_addr, bool is_return,
-                                            std::vector<void **> var_addrs);
-  std::vector<void *> *free_stack_array(void **arr_addr, size_t size,
-                                        void *ret_addr, bool is_return);
+  __sanitizer::Vector<void *> *
+  free_stack_variables(void *ret_addr, bool is_return,
+                       __sanitizer::Vector<void **> &var_addrs);
+  __sanitizer::Vector<void *> *free_stack_array(void **arr_addr, size_t size,
+                                                void *ret_addr, bool is_return);
   void check_returned_or_stored_value(void *ret_ptr_addr,
                                       void *compare_ptr_addr);
   void check_memory_leak(void *addr);

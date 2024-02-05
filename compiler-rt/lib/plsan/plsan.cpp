@@ -1,4 +1,5 @@
 #include "plsan.h"
+#include "sanitizer_common/sanitizer_libc.h"
 
 #include <cstdarg>
 #include <cstddef>
@@ -7,8 +8,10 @@
 __plsan::Plsan *plsan;
 
 namespace {
-using LazyCheckInfo = std::tuple</*RefCountZeroAddrs=*/std::vector<void *> *,
-                                 /*ProgramCounterAddr=*/void *>;
+struct LazyCheckInfo {
+  __sanitizer::Vector<void *> *RefCountZeroAddrs;
+  void *ProgramCounterAddr;
+};
 }
 
 /* Initialization routines called before main() */
@@ -31,47 +34,54 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
 }
 
-extern "C" std::tuple<std::vector<void *> *, void *> *
+extern "C" LazyCheckInfo *
 __plsan_free_stack_variables(size_t count, void *ret_addr, int is_return, ...) {
   // We cannot use C++ style variable arguments, because extern keyword for
   // compatiable with C.
 
-  std::vector<void **> args;
+  __sanitizer::Vector<void **> args;
 
   va_list var_addrs;
   va_start(var_addrs, is_return);
 
   for (int i = 0; i < count; i++)
-    args.push_back(va_arg(var_addrs, void **));
+    args.PushBack(va_arg(var_addrs, void **));
 
   va_end(var_addrs);
 
-  std::vector<void *> *ref_count_zero_addrs =
+  __sanitizer::Vector<void *> *ref_count_zero_addrs =
       plsan->free_stack_variables(ret_addr, is_return, args);
 
   // This return will be changed. It have to contain stack trace data.
   // __builtin_return_address(0) will return program counter
-  return new std::tuple(ref_count_zero_addrs, __builtin_return_address(0));
+  LazyCheckInfo *lazy_check_info = new LazyCheckInfo();
+  lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
+  lazy_check_info->ProgramCounterAddr = __builtin_return_address(0);
+  return lazy_check_info;
 }
 
-extern "C" std::tuple<std::vector<void *> *, void *> *
-__plsan_free_stack_array(void **arr_start_addr, size_t size, void *ret_addr,
-                         bool is_return) {
-  std::vector<void *> *ref_count_zero_addrs =
+extern "C" LazyCheckInfo *__plsan_free_stack_array(void **arr_start_addr,
+                                                   size_t size, void *ret_addr,
+                                                   bool is_return) {
+  __sanitizer::Vector<void *> *ref_count_zero_addrs =
       plsan->free_stack_array(arr_start_addr, size, ret_addr, is_return);
 
   // This return will be changed. It have to contain stack trace data.
   // __builtin_return_address(0) will return program counter
-  return new std::tuple(ref_count_zero_addrs, __builtin_return_address(0));
+  LazyCheckInfo *lazy_check_info = new LazyCheckInfo();
+  lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
+  lazy_check_info->ProgramCounterAddr = __builtin_return_address(0);
+  return lazy_check_info;
 }
 
 extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
                                    void *ret_addr) {
-  std::vector<void *> *lazy_check_addr_list = std::get<0>(*lazy_check_info);
-  void *program_counter = std::get<1>(*lazy_check_info);
+  __sanitizer::Vector<void *> *lazy_check_addr_list =
+      lazy_check_info->RefCountZeroAddrs;
+  void *program_counter = lazy_check_info->ProgramCounterAddr;
 
-  for (void *lazy_check_addr : *lazy_check_addr_list) {
-    if (lazy_check_addr != ret_addr)
+  for (int i = 0; i < lazy_check_addr_list->Size(); i++) {
+    if ((*lazy_check_addr_list)[i] != ret_addr)
       throw ret_addr;
   }
 
@@ -119,7 +129,7 @@ void Plsan::init_refcnt(void *addr, size_t size) {
   // https://github.com/hygoni/precise-leak-sanitizer/issues/29
 
   int8_t initialize_value = '\0';
-  memset(addr, initialize_value, size);
+  __sanitizer::__sanitizer_internal_memset(addr, initialize_value, size);
 
   shadow->alloc_shadow(addr, size);
 }
@@ -136,9 +146,9 @@ void Plsan::reference_count(void **lhs, void *rhs) {
   check_memory_leak(*lhs);
 }
 
-std::vector<void *> *
+__sanitizer::Vector<void *> *
 Plsan::free_stack_variables(void *ret_addr, bool is_return,
-                            std::vector<void **> var_addrs) {
+                            __sanitizer::Vector<void **> &var_addrs) {
   // free_stack_variables method calls above return instruction or some method
   // that pop(restore) stack.
   // 1. If free_stack_variables calls above return instruction, then "is_return"
@@ -153,14 +163,16 @@ Plsan::free_stack_variables(void *ret_addr, bool is_return,
   // If is_return is falsem, then this method return target address that check
   // leak lazily.
 
-  std::vector<void *> *ref_count_zero_addrs = new std::vector<void *>();
+  __sanitizer::Vector<void *> *ref_count_zero_addrs =
+      new __sanitizer::Vector<void *>();
 
-  for (void **var_addr : var_addrs) {
+  for (int i = 0; i < var_addrs.Size(); i++) {
+    void **var_addr = var_addrs[i];
     shadow->add_shadow(*var_addr, 1);
     if (!is_return) {
       RefCountAnalysis analysis_result = shadow->shadow_analysis(*var_addr);
-      if (std::get<1>(analysis_result) == RefCountZero)
-        ref_count_zero_addrs->push_back(*var_addr);
+      if (analysis_result.exceptTy == RefCountZero)
+        ref_count_zero_addrs->PushBack(*var_addr);
     } else if (*var_addr != ret_addr) {
       check_memory_leak(*var_addr);
     }
@@ -172,21 +184,24 @@ Plsan::free_stack_variables(void *ret_addr, bool is_return,
     return nullptr;
 }
 
-std::vector<void *> *Plsan::free_stack_array(void **arr_addr, size_t size,
-                                             void *ret_addr, bool is_return) {
+__sanitizer::Vector<void *> *Plsan::free_stack_array(void **arr_addr,
+                                                     size_t size,
+                                                     void *ret_addr,
+                                                     bool is_return) {
   // This method almost same with free_stack_variables method, but it is for
   // arrays in stack. "arr_addr" arg has array start address "size" arg has
   // array size
 
-  std::vector<void *> *ref_count_zero_addrs = new std::vector<void *>();
+  __sanitizer::Vector<void *> *ref_count_zero_addrs =
+      new __sanitizer::Vector<void *>();
 
   for (int i = 0; i < size; i++) {
     void *ptr_value = ptr_array_value(arr_addr, i);
     shadow->add_shadow(ptr_value, 1);
     if (!is_return) {
       RefCountAnalysis analysis_result = shadow->shadow_analysis(ptr_value);
-      if (std::get<1>(analysis_result) == RefCountZero)
-        ref_count_zero_addrs->push_back(ptr_value);
+      if (analysis_result.exceptTy == RefCountZero)
+        ref_count_zero_addrs->PushBack(ptr_value);
     } else if (ptr_value != ret_addr) {
       check_memory_leak(ptr_value);
     }
@@ -207,7 +222,7 @@ void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
 
   RefCountAnalysis analysis_result = shadow->shadow_analysis(ret_ptr_addr);
   // check address type
-  if (std::get<0>(analysis_result) == NonDynAlloc) {
+  if (analysis_result.addrTy == NonDynAlloc) {
     return;
   } else if (!shadow->shadow_value_is_equal(ret_ptr_addr, compare_ptr_addr)) {
     check_memory_leak(analysis_result);
@@ -217,14 +232,14 @@ void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
 void Plsan::check_memory_leak(void *addr) {
   RefCountAnalysis analysis_result = shadow->shadow_analysis(addr);
   // check exception type
-  if (std::get<1>(analysis_result) == RefCountZero) {
+  if (analysis_result.exceptTy == RefCountZero) {
     handler->exception_check(analysis_result);
   }
 }
 
 void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   // check exception type
-  if (std::get<1>(analysis_result) == RefCountZero) {
+  if (analysis_result.exceptTy == RefCountZero) {
     handler->exception_check(analysis_result);
   }
 }
