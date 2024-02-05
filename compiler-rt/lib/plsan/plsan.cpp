@@ -4,6 +4,19 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstring>
+#include <pthread.h>
+
+#include "lsan/lsan_common.h"
+#include "sanitizer_common/sanitizer_atomic.h"
+#include "sanitizer_common/sanitizer_common.h"
+#include "sanitizer_common/sanitizer_flag_parser.h"
+#include "sanitizer_common/sanitizer_flags.h"
+#include "sanitizer_common/sanitizer_interface_internal.h"
+#include "sanitizer_common/sanitizer_libc.h"
+#include "sanitizer_common/sanitizer_procmaps.h"
+#include "sanitizer_common/sanitizer_stackdepot.h"
+#include "sanitizer_common/sanitizer_stacktrace.h"
+#include "sanitizer_common/sanitizer_symbolizer.h"
 
 __plsan::Plsan *plsan;
 
@@ -263,4 +276,58 @@ void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
   return (void *)(*(array_addr + index));
 }
 
+void PlsanInstallAtForkHandler() {
+  auto before = []() {
+    PlsanAllocatorLock();
+    StackDepotLockAll();
+  };
+  auto after = []() {
+    StackDepotUnlockAll();
+    PlsanAllocatorUnlock();
+  };
+  pthread_atfork(before, after, after);
+}
+
+bool plsan_init_is_running;
+bool plsan_inited;
+
+__attribute__((constructor(0))) void __plsan_init() {
+  CHECK(!plsan_init_is_running);
+  if (plsan_inited)
+    return;
+  plsan_init_is_running = true;
+  SanitizerToolName = "PreciseLeakSanitizer";
+
+  InitializeInterceptors();
+  PlsanAllocatorInit();
+
+  InitializeThreads();
+  InitializeMainThread();
+
+  __lsan::InitCommonLsan();
+  InstallAtExitCheckLeaks();
+
+  if (common_flags()->detect_leaks) {
+    __lsan::ScopedInterceptorDisabler disabler;
+    Symbolizer::LateInitialize();
+  }
+
+  VPrintf(1, "PreciseLeakSanitizer init done\n");
+
+  plsan_init_is_running = false;
+  plsan_inited = true;
+}
+
 } // namespace __plsan
+
+void __sanitizer::BufferedStackTrace::UnwindImpl(uptr pc, uptr bp,
+                                                 void *context,
+                                                 bool request_fast,
+                                                 u32 max_depth) {
+  using namespace __plsan;
+  ThreadContextPlsanBase *t = GetCurrentThread();
+  if (!t || !StackTrace::WillUseFastUnwind(request_fast)) {
+    return Unwind(max_depth, pc, bp, context, 0, 0, false);
+  }
+  Unwind(max_depth, pc, bp, nullptr, t->stack_begin(), t->stack_end(), true);
+}
