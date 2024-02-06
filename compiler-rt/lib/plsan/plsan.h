@@ -12,7 +12,7 @@ public:
   ~Plsan();
 
   // Instrumentation function
-  size_t align_size(size_t size);
+
   void init_refcnt(void *addr, size_t size);
   void fini_refcnt(void *addr);
   void reference_count(void **lhs, void *rhs);

@@ -22,8 +22,6 @@ __attribute__((constructor)) void __plsan_init() {
 /* finialization routines called after main() */
 __attribute__((destructor)) void __plsan_fini() { delete plsan; }
 
-extern "C" size_t __plsan_align(size_t size) { return plsan->align_size(size); }
-
 extern "C" void __plsan_alloc(void *addr, size_t size) {
   plsan->init_refcnt(addr, size);
 }
@@ -119,11 +117,6 @@ Plsan::~Plsan() {
   delete handler;
 }
 
-size_t Plsan::align_size(size_t size) {
-  // Align size with multiples of MIN_DYN_ALLOC_SIZE (defined in plsan_shadow.h)
-  return (size + MIN_DYN_ALLOC_SIZE - 1) & ~(MIN_DYN_ALLOC_SIZE - 1);
-}
-
 void Plsan::init_refcnt(void *addr, size_t size) {
   // Initialize not only shadow memory but dynamic allocated memory.
   // https://github.com/hygoni/precise-leak-sanitizer/issues/29
@@ -131,7 +124,7 @@ void Plsan::init_refcnt(void *addr, size_t size) {
   int8_t initialize_value = '\0';
   __sanitizer::__sanitizer_internal_memset(addr, initialize_value, size);
 
-  shadow->alloc_shadow(addr, size);
+  shadow->alloc_shadow(addr);
 }
 
 void Plsan::fini_refcnt(void *addr) { shadow->free_shadow(addr); }

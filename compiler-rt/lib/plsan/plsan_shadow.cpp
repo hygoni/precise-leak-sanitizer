@@ -1,45 +1,19 @@
 #include "plsan_shadow.h"
 
-#include <sys/mman.h>
-
 namespace __plsan {
 
-PlsanShadow::PlsanShadow() {
-  void *mmap_addr = mmap(NULL, MMAP_SIZE, PROT_READ | PROT_WRITE,
-                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0);
-  if (mmap_addr == MAP_FAILED)
-    throw "mmap failed\n";
-  else
-    shadow_addr = static_cast<ShadowBlockSize *>(mmap_addr);
-}
-
-PlsanShadow::~PlsanShadow() { munmap(shadow_addr, MMAP_SIZE); }
-
-void PlsanShadow::alloc_shadow(void *addr, size_t size) {
-  ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
-  // If address is not dynamic allocated memory
-  if (*shadow_addr <= 0) {
-    for (int i = 1; i < size / MIN_DYN_ALLOC_SIZE; i++)
-      if (-i > -SHADOW_INIT_VALUE - 1)
-        *(shadow_addr + i) = -i;
-      else
-        *(shadow_addr + i) = -SHADOW_INIT_VALUE - 1;
-  }
-  *shadow_addr = SHADOW_INIT_VALUE;
+void PlsanShadow::alloc_shadow(void *addr) {
+  ShadowBlockSize *refcnt_addr = addr_to_refcnt(addr);
+  *refcnt_addr = SHADOW_INIT_VALUE;
 }
 
 void PlsanShadow::free_shadow(void *addr) {
-  ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
-  // If address is dynamic allocated memory
-  if (*shadow_addr > 0) {
-    *shadow_addr = 0;
-    while (*(++shadow_addr) < 0)
-      *shadow_addr = 0;
-  }
+  ShadowBlockSize *refcnt_addr = addr_to_refcnt(addr);
+  *refcnt_addr = SHADOW_FREE_VALUE;
 }
 
 void PlsanShadow::add_shadow(void *addr, int value) {
-  ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
+  ShadowBlockSize *shadow_addr = addr_to_refcnt(addr);
   // If address is dynamic allocated memory
   if (*shadow_addr > 0) {
     if (*shadow_addr + value < SHADOW_INIT_VALUE)
@@ -52,18 +26,18 @@ void PlsanShadow::add_shadow(void *addr, int value) {
 // Shadow class no need to know this logic, but remain this function for
 // convenience.
 void PlsanShadow::update_shadow(void *lhs, void *rhs) {
-  add_shadow(lhs, 1);  // Decreasing ref count
-  add_shadow(rhs, -1); // Increasing ref count
+  add_shadow(lhs, -1); // Decreasing ref count
+  add_shadow(rhs, 1);  // Increasing ref count
 }
 
 bool PlsanShadow::shadow_value_is_equal(void *a, void *b) {
-  ShadowBlockSize *a_shadow_addr = addr_to_shadow_addr(a);
-  ShadowBlockSize *b_shadow_addr = addr_to_shadow_addr(b);
+  ShadowBlockSize *a_shadow_addr = addr_to_refcnt(a);
+  ShadowBlockSize *b_shadow_addr = addr_to_refcnt(b);
   return *a_shadow_addr == *b_shadow_addr;
 }
 
 RefCountAnalysis PlsanShadow::shadow_analysis(void *addr) {
-  ShadowBlockSize *shadow_addr = addr_to_shadow_addr(addr);
+  ShadowBlockSize *shadow_addr = addr_to_refcnt(addr);
   AddrType addr_type;
   ExceptionType exception_type;
   // If address is dynamic allocated memory
@@ -83,12 +57,8 @@ RefCountAnalysis PlsanShadow::shadow_analysis(void *addr) {
   return result;
 }
 
-ShadowBlockSize *PlsanShadow::addr_to_shadow_addr(void *addr) {
-  intptr_t int_address = reinterpret_cast<intptr_t>(addr);
-  ShadowBlockSize *refcnt_addr = shadow_addr + int_address / MIN_DYN_ALLOC_SIZE;
-  while (*refcnt_addr < 0)
-    refcnt_addr += *refcnt_addr;
-  return refcnt_addr;
-}
+ShadowBlockSize *PlsanShadow::addr_to_refcnt(void *addr) { return nullptr; }
+
+bool PlsanShadow::addr_is_dyn_allocated(void *addr) { return true; }
 
 } // namespace __plsan
