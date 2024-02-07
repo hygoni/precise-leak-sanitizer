@@ -1,4 +1,5 @@
 #include "plsan_handler.h"
+#include <cstdio>
 #include <cstdlib>
 
 namespace __plsan {
@@ -7,6 +8,7 @@ void PlsanHandler::exception_check(RefCountAnalysis ref_count_analysis) {
   AddrType addrType;
   ExceptionType exceptionType;
   // print_stack_trace(NULL, 0, std::cerr);
+  printf("PreciseLeakSanitizer\n");
   exit(EXIT_FAILURE);
 }
 

@@ -37,12 +37,47 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 }
 
 static Metadata *GetMetadata(const void *p) {
-  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
+  if (!allocator.PointerIsMine(p))
+    return nullptr;
+
+  if (allocator.FromPrimary(p))
+    return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
+
+  void *aligned_p = (void *)((uptr)p & ~(GetPageSizeCached() - 1));
+  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(aligned_p));
+}
+
+void IncRefCount(const void *p) { GetMetadata(p)->IncRefCount(); }
+
+void DecRefCount(const void *p) { GetMetadata(p)->DecRefCount(); }
+
+bool PtrIsAllocatedFromPlsan(const void *p) {
+  if (!allocator.PointerIsMine(p))
+    return false;
+
+  struct Metadata *m = GetMetadata(p);
+  if (!m)
+    return false;
+  return m->IsAllocated();
+}
+
+bool IsSameObject(const void *x, const void *y) {
+  return GetMetadata(x) == GetMetadata(y);
+}
+
+uint8_t GetRefCount(const void *p) { return GetMetadata(p)->GetRefCount(); }
+
+void UpdateReference(const void *lhs, const void *rhs) {
+  if (PtrIsAllocatedFromPlsan(lhs))
+    DecRefCount(lhs);
+  if (PtrIsAllocatedFromPlsan(rhs))
+    IncRefCount(rhs);
 }
 
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
   alloc_trace_id = stack;
+  state = (1 << 7);
 }
 
 inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
@@ -52,6 +87,7 @@ inline __lsan::ChunkTag Metadata::GetLsanTag() const { return lsan_tag; }
 inline void Metadata::SetUnallocated() {
   requested_size = 0;
   alloc_trace_id = 0;
+  state = 0;
 }
 
 bool Metadata::IsAllocated() const { return state >> 7; }
@@ -60,11 +96,37 @@ inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
 inline u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
 
-inline uint8_t Metadata::GetRefCount() const { return state & ~(1 << 1); }
+inline uint8_t Metadata::GetRefCount() const { return state & ~(1 << 7); }
 
 inline void Metadata::SetRefCount(uint8_t val) {
   atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), val,
                memory_order_relaxed);
+}
+
+inline void Metadata::IncRefCount() {
+  uint8_t s = state;
+
+  do {
+    if (state == UINT8_MAX) {
+      return;
+    }
+
+  } while (!atomic_compare_exchange_strong(
+      reinterpret_cast<atomic_uint8_t *>(&state), &s, s + 1,
+      memory_order_relaxed));
+}
+
+inline void Metadata::DecRefCount() {
+  uint8_t s = state;
+
+  do {
+    if (GetRefCount() == 0) {
+      return;
+    }
+
+  } while (!atomic_compare_exchange_strong(
+      reinterpret_cast<atomic_uint8_t *>(&state), &s, s - 1,
+      memory_order_relaxed));
 }
 
 void PlsanAllocatorLock() { allocator.ForceLock(); }

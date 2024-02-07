@@ -44,9 +44,6 @@ private:
   FunctionType *CheckMemoryLeakFnTy;
   FunctionType *MemcpyRefcntFnTy;
   FunctionType *ReallocInstrumentFnTy;
-  FunctionCallee AlignFn;
-  FunctionCallee AllocFn;
-  FunctionCallee FreeFn;
   FunctionCallee StoreFn;
   FunctionCallee FreeStackVariablesFn;
   FunctionCallee FreeStackArrayFn;
@@ -54,10 +51,6 @@ private:
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
   FunctionCallee MemcpyRefcntFn;
-  FunctionCallee ReallocInstrumentFn;
-  StringRef AlignFnName = "__plsan_align";
-  StringRef AllocFnName = "__plsan_alloc";
-  StringRef FreeFnName = "__plsan_free";
   StringRef StoreFnName = "__plsan_store";
   StringRef FreeStackVariablesFnName = "__plsan_free_stack_variables";
   StringRef FreeStackArrayFnName = "__plsan_free_stack_array";
@@ -66,7 +59,6 @@ private:
       "__plsan_check_returned_or_stored_value";
   StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
   StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
-  StringRef ReallocInstrumentFnName = "__plsan_realloc_instrument";
 
   bool initializeModule();
   CallInst *CreateCallWithMetaData(IRBuilder<> &Builder, FunctionCallee Fn,
@@ -93,12 +85,6 @@ private:
   std::stack<std::vector<ArrayAddrInfo>> LocalPtrArrListStack;
   std::stack<CallInst *> LazyCheckInfoStack;
   Instruction *InstructionTraceTopDown(Instruction *I);
-  void visitCallMalloc(CallInst &I);
-  void visitCallCalloc(CallInst &I);
-  void visitCallRealloc(CallInst &I);
-  void visitCallNew(CallInst &I);
-  void visitCallArrTyNew(CallInst &I);
-  void visitCallFree(CallInst &I);
   void visitCallMemset(CallInst &I);
   void visitCallMemcpy(CallInst &I);
   void visitCallMemmove(CallInst &I);

@@ -135,65 +135,13 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
     }
   }
 
-  if (FuncName == "malloc")
-    visitCallMalloc(I);
-  if (FuncName == "calloc")
-    visitCallCalloc(I);
   if (std::regex_match(FuncName.str(),
                        std::regex("^llvm\\.memcpy\\.[a-zA-Z0-9\\.\\*]*")))
     visitCallMemcpy(I);
-  if (FuncName == "free")
-    visitCallFree(I);
   if (FuncName == "llvm.stacksave")
     visitLLVMStacksave(I);
   if (FuncName == "llvm.stackrestore")
     visitLLVMStackrestore(I);
-}
-
-void PreciseLeakSanVisitor::visitCallMalloc(CallInst &I) {
-  IRBuilder<> Builder(&I);
-  Value *MallocSizeArg = I.getArgOperand(0);
-  Value *AlignedMallocSizeArg =
-      Plsan.CreateCallWithMetaData(Builder, Plsan.AlignFn, {MallocSizeArg});
-  I.setArgOperand(0, AlignedMallocSizeArg);
-  Builder.SetInsertPoint(I.getNextNode());
-  Plsan.CreateCallWithMetaData(Builder, Plsan.AllocFn,
-                               {&I, AlignedMallocSizeArg});
-}
-
-void PreciseLeakSanVisitor::visitCallCalloc(CallInst &I) {
-  IRBuilder<> Builder(&I);
-  Value *CallocNumArg = I.getArgOperand(0);
-  Value *CallocSizeArg = I.getArgOperand(1);
-  Value *AllocSize = Builder.CreateMul(CallocNumArg, CallocSizeArg);
-  ConstantInt *AlignedCallocNumArg =
-      ConstantInt::get(Type::getInt64Ty(Plsan.Ctx), 1);
-  Value *AlignedCallocSizeArg =
-      Plsan.CreateCallWithMetaData(Builder, Plsan.AlignFn, {AllocSize});
-  I.setArgOperand(0, AlignedCallocNumArg);
-  I.setArgOperand(1, AlignedCallocSizeArg);
-  Builder.SetInsertPoint(I.getNextNode());
-  Plsan.CreateCallWithMetaData(Builder, Plsan.AllocFn,
-                               {&I, AlignedCallocSizeArg});
-}
-
-void PreciseLeakSanVisitor::visitCallRealloc(CallInst &I) {
-  IRBuilder<> Builder(&I);
-  Value *ReallocOriginPtrArg = I.getArgOperand(0);
-  Builder.SetInsertPoint(I.getNextNode());
-  Plsan.CreateCallWithMetaData(Builder, Plsan.ReallocInstrumentFn,
-                               {ReallocOriginPtrArg, &I});
-}
-
-void PreciseLeakSanVisitor::visitCallNew(CallInst &I) { return; }
-
-void PreciseLeakSanVisitor::visitCallArrTyNew(CallInst &I) { return; }
-
-void PreciseLeakSanVisitor::visitCallFree(CallInst &I) {
-  IRBuilder<> Builder(&I);
-  Value *FreeAddrArg = I.getArgOperand(0);
-  Builder.SetInsertPoint(I.getNextNode());
-  Plsan.CreateCallWithMetaData(Builder, Plsan.FreeFn, {FreeAddrArg});
 }
 
 void PreciseLeakSanVisitor::visitCallMemset(CallInst &I) { return; }
@@ -262,15 +210,6 @@ bool PreciseLeakSanitizer::initializeModule() {
   Int64Ty = Type::getInt64Ty(Ctx);
   BoolTy = Type::getInt1Ty(Ctx);
 
-  AlignFnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
-  AlignFn = Mod.getOrInsertFunction(AlignFnName, AlignFnTy);
-
-  AllocFnTy = FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty}, false);
-  AllocFn = Mod.getOrInsertFunction(AllocFnName, AllocFnTy);
-
-  FreeFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
-  FreeFn = Mod.getOrInsertFunction(FreeFnName, FreeFnTy);
-
   StoreFnTy = FunctionType::get(VoidTy, {VoidPtrPtrTy, VoidPtrTy}, false);
   StoreFn = Mod.getOrInsertFunction(StoreFnName, StoreFnTy);
 
@@ -300,11 +239,6 @@ bool PreciseLeakSanitizer::initializeModule() {
       FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
   MemcpyRefcntFn =
       Mod.getOrInsertFunction(MemcpyRefcntFnName, MemcpyRefcntFnTy);
-
-  ReallocInstrumentFnTy =
-      FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy}, false);
-  ReallocInstrumentFn =
-      Mod.getOrInsertFunction(ReallocInstrumentFnName, ReallocInstrumentFnTy);
 
   return true;
 }

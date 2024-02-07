@@ -53,6 +53,8 @@ public:
   inline __lsan::ChunkTag GetLsanTag() const;
   inline uint8_t GetRefCount() const;
   inline void SetRefCount(uint8_t val);
+  inline void IncRefCount();
+  inline void DecRefCount();
 };
 
 static const uptr kMaxAllowedMallocSize = 1UL << 40;

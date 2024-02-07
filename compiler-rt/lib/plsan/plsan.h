@@ -1,14 +1,13 @@
 #ifndef PLSAN_H
 #define PLSAN_H
 
+#include "plsan_handler.h"
 #include "plsan_thread.h"
 #if SANITIZER_POSIX
 #include "plsan_posix.h"
 #endif
 
 #include "plsan_internal.h"
-#include "plsan_shadow.h"
-
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
 namespace __plsan {
@@ -19,9 +18,7 @@ public:
   ~Plsan();
 
   // Instrumentation function
-  size_t align_size(size_t size);
-  void init_refcnt(void *addr, size_t size);
-  void fini_refcnt(void *addr);
+
   void reference_count(void **lhs, void *rhs);
   __sanitizer::Vector<void *> *
   free_stack_variables(void *ret_addr, bool is_return,
@@ -33,10 +30,9 @@ public:
   void check_memory_leak(void *addr);
   void check_memory_leak(RefCountAnalysis analysis_result);
   void memcpy_refcnt(void *dest, void *src, size_t count);
-  void realloc_instrument(void *origin_addr, void *realloc_addr);
+  RefCountAnalysis leak_analysis(const void *ptr);
 
 private:
-  PlsanShadow *shadow;
   PlsanHandler *handler;
   void *ptr_array_value(void *array_start_addr, size_t index);
 };
@@ -47,6 +43,12 @@ extern bool plsan_init_is_running;
 void PlsanAllocatorInit();
 void PlsanAllocatorLock();
 void PlsanAllocatorUnlock();
+void UpdateReference(const void *lhs, const void *rhs);
+bool PtrIsAllocatedFromPlsan(const void *p);
+bool IsSameObject(const void *p, const void *q);
+void IncRefCount(const void *p);
+void DecRefCount(const void *p);
+uint8_t GetRefCount(const void *p);
 
 void *plsan_malloc(uptr size, StackTrace *stack);
 void *plsan_calloc(uptr nmemb, uptr size, StackTrace *stack);
