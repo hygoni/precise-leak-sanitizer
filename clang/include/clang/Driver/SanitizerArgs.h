@@ -90,8 +90,7 @@ public:
   bool needsFuzzer() const { return Sanitizers.has(SanitizerKind::Fuzzer); }
   bool needsPlsanRt() const { return Sanitizers.has(SanitizerKind::PreciseLeak); }
   bool needsLsanRt() const {
-    return Sanitizers.has(SanitizerKind::PreciseLeak) ||
-           (Sanitizers.has(SanitizerKind::Leak) &&
+    return (Sanitizers.has(SanitizerKind::Leak) &&
             !Sanitizers.has(SanitizerKind::Address) &&
             !Sanitizers.has(SanitizerKind::HWAddress));
   }

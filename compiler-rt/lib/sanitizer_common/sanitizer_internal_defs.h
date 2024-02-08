@@ -447,6 +447,11 @@ using namespace __sanitizer;
 namespace __lsan {
 using namespace __sanitizer;
 }
+
+namespace __plsan {
+using namespace __sanitizer;
+}
+
 namespace __msan {
 using namespace __sanitizer;
 }

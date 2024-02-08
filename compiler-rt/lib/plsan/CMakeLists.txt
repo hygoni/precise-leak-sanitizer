@@ -4,13 +4,22 @@ include_directories(../../include)
 set(PLSAN_SOURCES
     plsan.cpp
     plsan_handler.cpp
-    plsan_shadow.cpp
+    plsan_allocator.cpp
+    plsan_allocation_functions.cpp
+    plsan_new_delete.cpp
+    plsan_interceptors.cpp
+    plsan_linux.cpp
+    plsan_posix.cpp
+    plsan_thread.cpp
 )
 
 set(PLSAN_HEADERS
     plsan.h
     plsan_handler.h
-    plsan_shadow.h
+    plsan_internal.h
+    plsan_linux.h
+    plsan_posix.h
+    plsan_thread.h
     lib/backward.h
 )
 
@@ -18,13 +27,14 @@ set(PLSAN_LINK_FLAGS
     ${SANITIZER_COMMON_LINK_FLAGS}
     ${WEAK_SYMBOL_LINNK_FLAGS})
 set(PLSAN_LINK_LIBS
-#    ${SANITIZER_COMMON_LINK_LIBS}
+    ${COMPILER_RT_UNWINDER_LINK_LIBS}
+    ${SANITIZER_COMMON_LINK_LIBS}
     ${COMPILER_RT_CXX_LINK_LIBS})
 set(PLSAN_CFLAGS
 #    ${COMPILER_RT_COMMON_CFLAGS}
     ${COMPILER_RT_CXX_CFLAGS}
 #    ${SANITIZER_COMMON_CFLAGS}
-    -fexceptions
+    -fexceptions -g -O0
 )
 
 # Allow the PLSAN runtime to reference LLVM headers.
@@ -55,6 +65,12 @@ if(COMPILER_RT_HAS_PLSAN)
       ARCHS ${arch}
       CFLAGS ${PLSAN_CFLAGS}
       OBJECT_LIBS PLSAN_main
+                  RTInterception
+                  RTSanitizerCommon
+                  RTSanitizerCommonLibc
+                  RTSanitizerCommonCoverage
+                  RTSanitizerCommonSymbolizer
+                  RTLSanCommon
       LINK_FLAGS ${PLSAN_LINK_FLAGS}
       LINK_LIBS ${PLSAN_LINK_LIBS}
       PARENT_TARGET plsan)

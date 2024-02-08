@@ -4,6 +4,19 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstring>
+#include <pthread.h>
+
+#include "lsan/lsan_common.h"
+#include "sanitizer_common/sanitizer_atomic.h"
+#include "sanitizer_common/sanitizer_common.h"
+#include "sanitizer_common/sanitizer_flag_parser.h"
+#include "sanitizer_common/sanitizer_flags.h"
+#include "sanitizer_common/sanitizer_interface_internal.h"
+#include "sanitizer_common/sanitizer_libc.h"
+#include "sanitizer_common/sanitizer_procmaps.h"
+#include "sanitizer_common/sanitizer_stackdepot.h"
+#include "sanitizer_common/sanitizer_stacktrace.h"
+#include "sanitizer_common/sanitizer_symbolizer.h"
 
 __plsan::Plsan *plsan;
 
@@ -21,14 +34,6 @@ __attribute__((constructor)) void __plsan_init() {
 
 /* finialization routines called after main() */
 __attribute__((destructor)) void __plsan_fini() { delete plsan; }
-
-extern "C" size_t __plsan_align(size_t size) { return plsan->align_size(size); }
-
-extern "C" void __plsan_alloc(void *addr, size_t size) {
-  plsan->init_refcnt(addr, size);
-}
-
-extern "C" void __plsan_free(void *addr) { plsan->fini_refcnt(addr); }
 
 extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
@@ -102,39 +107,15 @@ extern "C" void __plsan_memcpy_refcnt(void *dest, void *src, size_t count) {
   plsan->memcpy_refcnt(dest, src, count);
 }
 
-extern "C" void __plsan_realloc_instrument(void *origin_addr,
-                                           void *realloc_addr) {
-  plsan->realloc_instrument(origin_addr, realloc_addr);
-}
-
 namespace __plsan {
 
 Plsan::Plsan() {
-  shadow = new PlsanShadow();
   handler = new PlsanHandler();
 }
 
 Plsan::~Plsan() {
-  delete shadow;
   delete handler;
 }
-
-size_t Plsan::align_size(size_t size) {
-  // Align size with multiples of MIN_DYN_ALLOC_SIZE (defined in plsan_shadow.h)
-  return (size + MIN_DYN_ALLOC_SIZE - 1) & ~(MIN_DYN_ALLOC_SIZE - 1);
-}
-
-void Plsan::init_refcnt(void *addr, size_t size) {
-  // Initialize not only shadow memory but dynamic allocated memory.
-  // https://github.com/hygoni/precise-leak-sanitizer/issues/29
-
-  int8_t initialize_value = '\0';
-  __sanitizer::__sanitizer_internal_memset(addr, initialize_value, size);
-
-  shadow->alloc_shadow(addr, size);
-}
-
-void Plsan::fini_refcnt(void *addr) { shadow->free_shadow(addr); }
 
 void Plsan::reference_count(void **lhs, void *rhs) {
   // Ref count with Shadow class update_shadow method.
@@ -142,7 +123,7 @@ void Plsan::reference_count(void **lhs, void *rhs) {
   // leak. update_shadow method only decrease lhs's ref count, no problem with
   // checking only lhs.
 
-  shadow->update_shadow(*lhs, rhs);
+  UpdateReference(lhs, rhs);
   check_memory_leak(*lhs);
 }
 
@@ -168,9 +149,9 @@ Plsan::free_stack_variables(void *ret_addr, bool is_return,
 
   for (int i = 0; i < var_addrs.Size(); i++) {
     void **var_addr = var_addrs[i];
-    shadow->add_shadow(*var_addr, 1);
+    DecRefCount(*var_addr);
     if (!is_return) {
-      RefCountAnalysis analysis_result = shadow->shadow_analysis(*var_addr);
+      RefCountAnalysis analysis_result = leak_analysis(*var_addr);
       if (analysis_result.exceptTy == RefCountZero)
         ref_count_zero_addrs->PushBack(*var_addr);
     } else if (*var_addr != ret_addr) {
@@ -197,9 +178,9 @@ __sanitizer::Vector<void *> *Plsan::free_stack_array(void **arr_addr,
 
   for (int i = 0; i < size; i++) {
     void *ptr_value = ptr_array_value(arr_addr, i);
-    shadow->add_shadow(ptr_value, 1);
+    DecRefCount(ptr_value);
     if (!is_return) {
-      RefCountAnalysis analysis_result = shadow->shadow_analysis(ptr_value);
+      RefCountAnalysis analysis_result = leak_analysis(ptr_value);
       if (analysis_result.exceptTy == RefCountZero)
         ref_count_zero_addrs->PushBack(ptr_value);
     } else if (ptr_value != ret_addr) {
@@ -220,17 +201,17 @@ void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
   // have to check if return pointer point dyn alloc memory and ref count is 0.
   // For more information, see doumentation 4.3.1 When a function exits
 
-  RefCountAnalysis analysis_result = shadow->shadow_analysis(ret_ptr_addr);
+  RefCountAnalysis analysis_result = leak_analysis(ret_ptr_addr);
   // check address type
   if (analysis_result.addrTy == NonDynAlloc) {
     return;
-  } else if (!shadow->shadow_value_is_equal(ret_ptr_addr, compare_ptr_addr)) {
+  } else if (!IsSameObject(ret_ptr_addr, compare_ptr_addr)) {
     check_memory_leak(analysis_result);
   }
 }
 
 void Plsan::check_memory_leak(void *addr) {
-  RefCountAnalysis analysis_result = shadow->shadow_analysis(addr);
+  RefCountAnalysis analysis_result = leak_analysis(addr);
   // check exception type
   if (analysis_result.exceptTy == RefCountZero) {
     handler->exception_check(analysis_result);
@@ -252,15 +233,83 @@ void Plsan::memcpy_refcnt(void *dest, void *src, size_t count) {
   }
 }
 
-void Plsan::realloc_instrument(void *origin_addr, void *realloc_addr) {
-  if (origin_addr != realloc_addr)
-    plsan->fini_refcnt(origin_addr);
-}
-
 void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
   // void * type cannot add with integer. So casting to int *.
   int64_t *array_addr = (int64_t *)array_start_addr;
   return (void *)(*(array_addr + index));
 }
 
+RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
+  AddrType addr_type;
+  ExceptionType exception_type;
+  // If address is dynamic allocated memory
+  if (PtrIsAllocatedFromPlsan(ptr)) {
+    addr_type = DynAlloc;
+    if (GetRefCount(ptr) == 0)
+      exception_type = RefCountZero;
+    else
+      exception_type = None;
+  } else {
+    addr_type = NonDynAlloc;
+    exception_type = None;
+  }
+
+  RefCountAnalysis result = {addr_type, exception_type};
+  return result;
+}
+
+void PlsanInstallAtForkHandler() {
+  auto before = []() {
+    PlsanAllocatorLock();
+    StackDepotLockAll();
+  };
+  auto after = []() {
+    StackDepotUnlockAll();
+    PlsanAllocatorUnlock();
+  };
+  pthread_atfork(before, after, after);
+}
+
+bool plsan_init_is_running;
+bool plsan_inited;
+
+__attribute__((constructor(0))) void __plsan_init() {
+  CHECK(!plsan_init_is_running);
+  if (plsan_inited)
+    return;
+  plsan_init_is_running = true;
+  SanitizerToolName = "PreciseLeakSanitizer";
+
+  InitializeInterceptors();
+  PlsanAllocatorInit();
+
+  InitializeThreads();
+  InitializeMainThread();
+
+  __lsan::InitCommonLsan();
+  InstallAtExitCheckLeaks();
+
+  if (common_flags()->detect_leaks) {
+    __lsan::ScopedInterceptorDisabler disabler;
+    Symbolizer::LateInitialize();
+  }
+
+  VPrintf(1, "PreciseLeakSanitizer init done\n");
+
+  plsan_init_is_running = false;
+  plsan_inited = true;
+}
+
 } // namespace __plsan
+
+void __sanitizer::BufferedStackTrace::UnwindImpl(uptr pc, uptr bp,
+                                                 void *context,
+                                                 bool request_fast,
+                                                 u32 max_depth) {
+  using namespace __plsan;
+  ThreadContextPlsanBase *t = GetCurrentThread();
+  if (!t || !StackTrace::WillUseFastUnwind(request_fast)) {
+    return Unwind(max_depth, pc, bp, context, 0, 0, false);
+  }
+  Unwind(max_depth, pc, bp, nullptr, t->stack_end(), t->stack_begin(), true);
+}
