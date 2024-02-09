@@ -3,97 +3,92 @@
 This document specifies pseudocode for the implementation of PreciseLeakSanitizer. It is a memory leak detector that can find memory leaks at runtime similar to [the leak sanitizer in LLVM and GCC](https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer). It is designed to pinpoint where the process lost its last reference efficiently.
 
 ## Table of Contents
-1. [Minimum alignment for allocation](#1-minimum-alignment-for-allocation)
+1. [LSan's ChunkMetadata](#1-lsan's-chunkmetadata)
 2. [Reference Count Encoding](#2-reference-count-encoding)   
-	- 2.1 [Initializing reference count](#21-initializing-reference-count)  
-	- 2.2 [Converting a virtual address to reference count](#22-converting-a-virtual-address-to-reference-count)  
-3. [mmap()ing Reference Counting Address Space](#3-mmaping-reference-counting-address-space)
-4. [Tracking reference count of a buffer](#4-tracking-reference-count-of-a-buffer)  
-	- 4.1 [When reference count is incremented](#41-when-reference-count-is-incremented)  
-	- 4.2 [When reference count is decremented](#42-when-reference-count-is-decremented)  
-	- 4.3 [More considerations and optimizations](#43-more-considerations-and-optimizations)  
-        - 4.3.1 [When a function exits](#431-when-a-function-exits)  
-        - 4.3.2 [Freed pointer variables either on heap or on stack should be initialized to NULL](#432-freed-pointer-variables-either-on-the-heap-or-on-the-stack-should-be-initialized-to-null)  
-        - 4.3.3 [Not instrumenting when storing to stack variables](#433-not-instrumenting-when-storing-to-stack-variables)    
-5. [Report a memory leak](#5-reporting-a-memory-leak)
-    - [5.2 Storing stack backtrace when memory is allocated](#51-storing-stack-backtrace-when-memory-is-allocated)
+	- 2.1 [Initializing reference count](#21-initializing-reference-count)   
+3. [Tracking reference count of a buffer](#4-tracking-reference-count-of-a-buffer)  
+	- 3.1 [When reference count is incremented](#41-when-reference-count-is-incremented)  
+	- 3.2 [When reference count is decremented](#42-when-reference-count-is-decremented)  
+	- 3.3 [More considerations and optimizations](#33-more-considerations-and-optimizations)  
+        - 3.3.1 [When a function exits](#331-when-a-function-exits)  
+        - 3.3.2 [Freed pointer variables either on heap or on stack should be initialized to NULL](#332-freed-pointer-variables-either-on-the-heap-or-on-the-stack-should-be-initialized-to-null)  
+        - 3.3.3 [Not instrumenting when storing to stack variables](#333-not-instrumenting-when-storing-to-stack-variables)    
+4. [Report a memory leak](#4-reporting-a-memory-leak)
+    - [4.2 Storing stack backtrace when memory is allocated](#41-storing-stack-backtrace-when-memory-is-allocated)
 
-## 1. Minimum alignment for allocation
-To ensure shadow memory work correctly, the size of each allocation must be aligned to a specific size. For reduced address space overhead, **we align the allocation size to 16 bytes.** This means that the size argument of malloc(), realloc(), calloc(), new and new[] must be aligned before calling these functions. **Note: If the size is not a constant, it should be replaced with an appropriate instruction, rather than a fixed constant.**
+## 1. LSan's ChunkMetadata
+To store Reference Count, understanding LSan's `ChunkMetadata` structure is very important. 
+
+LSan uses `ChunkMetadata` structure when it allocate some dynamic memory. See the LSan’s implementation, Interceptors are change standard C library funtions(e.g. malloc, realloc, valloc, calloc, … etc) to LSan's customized function. This is `ChunkMetadata` structure code below:
+
+```C++
+struct ChunkMetadata {
+  u8 allocated : 8;  // Must be first.
+  ChunkTag tag : 2;
+#if SANITIZER_WORDSIZE == 64
+  uptr requested_size : 54;
+#else
+  uptr requested_size : 32;
+  uptr padding : 22;
+#endif
+  u32 stack_trace_id;
+};
+```
+
+but LSan only use `allocated` field's 1 bit. because it is just indentifier to check each chunk is allocated, it has two states, `1` (allocated) and `0` (deallocated). So we decided to store reference count value on wasted 7-bits.
+
+However, Generally LSan's Metadata is not able to be accessed by external. To solve this problem,  LSan have to run above PreciseLeakSanitizer’s allocator.
 
 ## 2. Reference Count Encoding
-For every 16 bytes of address space, we allocate a byte for reference count. It is based on the assumption that **the number of references to a buffer does not exceed 127.** This concept is similar to the **shadow memory** used in AddressSanitizer, thus we use the terms **reference count address space** and **shadow memory** interchangeably. When the size exceeds 16, the additional reference counts become redundant as only one reference count is utilized per buffer.
+In previous section, ways to utilize ChunkMetadata structure already explained as simple. the picture is simpified diagram to shows our goal.
 
-While this method may lead to a maximum waste of 4095 bytes of memory for reference counts per object, it significantly speeds up the conversion of a virtual address to a reference count address. Moreover, allocating objects larger than 4K bytes is generally a rare occurrence.
+![alt text](./images/saving_refcount.png)
 
-The formula for virtual address to corresponding shadow memory address is as follows:
-```math
-refcnt\_addr = (start\ address\ of\ refcnt\ space) + \frac{(virtual\ address\ of\ a\ buffer)} {16}
-```
+`allocated`, Previously occupying 8-bits, is split into two : 1-bit and 7-bit. `allocated` will use MSB(Most Significant Bit), our goal, `refcount` will access least 7-bit.
 
-Which translates to a couple of instructions. However, the formula above is slightly misleading, as there is only one reference count for a buffer. When the size is larger than 16 bytes, then rest of the reference counts point to the first reference count by storing the offset from the first reference count as a negative value.
+The reason that storing refcount into least 7-bit is for convenience when increment/decrement calcuation. Additionally when returns allocated bit simpily is able to process from Bitwise operation, so we choose this selection.
 
 ### 2.1 Initializing reference count
-Initialization of reference count is as follows:
-```c
-when one of malloc(), calloc(), realloc() or new, new[] is called:
-int8_t *refcnt_addr = refcnt_start + (buffer's address) / 16
-*refcnt_addr = 127;
-for (int i = 1; i < size / 16; i++) {
-    if (i <= 127)
-        (refcnt_addr + i) = -(int8_t)i;
-    else
-        (refcnt_addr + i) = -128;
+Let’s see the LSan’s Code Snippets again. Next code is part of LSan’s Allocator code.
+
+```C++
+static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
+  if (!p) return;
+  ChunkMetadata *m = Metadata(p);
+  CHECK(m);
+  m->tag = DisabledInThisThread() ? kIgnored : kDirectlyLeaked;
+  m->stack_trace_id = StackDepotPut(stack);
+  m->requested_size = size;
+  atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 1, memory_order_relaxed);
+  RunMallocHooks(p, size);
+}
+
+static void RegisterDeallocation(void *p) {
+  if (!p) return;
+  ChunkMetadata *m = Metadata(p);
+  CHECK(m);
+  RunFreeHooks(p);
+  atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
 }
 ```
 
-Visually, reference counts are initialize like figure below. Note that in case where size is bigger than 128 * 16, storing -128 is ok because the first reference count is still reachable.
+Functions that `RegisterAllocation` and `RegisterDeallocation` are related to allocation and deallocation. See each function’s last line, stores `1` or `0` value into `ChunkMetadata` structure’s `allocated` field from `atomic_store` function.
 
-<p align="center">
-<img src="./images/reference-count.png" alt="reference count figure" width="600px"/>
-</p>
-Additionally, determining whether the memory address is dynamically allocated is crucial for identifying memory leaks. Memory allocated with mmap() is initialized to 0 when accessed. The reason for initializing the reference count to 127 is to distinguish dynamically allocated memory addresses. When dynamically allocated memory is referenced, the reference count is updated by decrementing it from 127.
+PreciseLeakSanitizer modify this, if the buffer is deallocation state, it will save `128` (`0b10000000`) and otherside store `127` (`0b10000001`) because to add refcount when allocation is executed. because it is a unsigned type. 
 
-1. If the converted address in shadow memory is 0, it indicates that the memory address belongs to a stack variable (or non-dynamically allocated memory) or unallocated in the heap.
-2. If the value at converted address in shadow memory is positive, it indicates that the memory address belongs to dynamically allocated memory.
+After this, PreciseLeakSanitizer will manage refcount same as solution that next section.
 
-### 2.2 Converting a virtual address to reference count
-```c
-/* @addr might be in the middle of a buffer */
-uint8_t *addr_to_refcnt_addr(void *addr)
-{
-     int8_t *refcnt_addr = refcnt_start + ((unsigned long long)addr) / 16;
-     while (*refcnt_addr < 0) {
-         refcnt_addr += *refcnt_addr;
-     }
-     return refcnt_addr;
-}
-```
-
-## 3. mmap()ing Reference Counting Address Space
-Note: For any uncertanities, always refer to [the mmap() manual](https://man7.org/linux/man-pages/man2/mmap.2.html).
-
-For reference counts, we use 1/16 of virtual address space of a process. Allocating an address space is done via mmap() system call in unix-like operating systems. Here we use the word **address space** and **mapping** interchangeably.
-
-More specifically, we allocate **anonymous mapping (MAP_ANONYMOUS)** as opposed **file-backed mapping**, simply because it is not backed by any file. Also, the mapping is **private (MAP_PRIVATE)** because it is not shared between processes.
-
-By the way 1/16 of total address space is huge size, as operating systems usually does not allow allocating much larger virtual address space than . Read [memory overcommit](https://en.wikipedia.org/wiki/Memory_overcommitment) for more detail; In short, **you need to pass MAP_NORESERVE** flag to mmap() to avoid issues on allocating very large address space.
-
-<p align="center">
-<img src="./images/shadow-memory.png" alt="shadow memory" width="600px"/>
-</p>
-
-## 4. Tracking reference count of a buffer
+## 3. Tracking reference count of a buffer
 
 As explained in [2.1 Initializing reference count](#21-initializing-reference-count) section, the reference count is initialized when allocating memory. Reference count is incremented or decremented, but when it reaches zero, generally it is a memory leak. But there are few exceptions on this. Read [section 4.3.1](#431-when-a-function-exits) for more details.
 
-### 4.1 When reference count is incremented
+### 3.1 When reference count is incremented
 Reference count is incremented when:
 
 1. Storing the value of a pointer to another variable.
 2. Copying memory to memory using memcpy(), memmove() or etc.
 
-### 4.2 When reference count is decremented
+### 3.2 When reference count is decremented
 Reference count is decremented when:
 
 1. Overwriting a pointer variable with another value.
@@ -101,9 +96,9 @@ Reference count is decremented when:
 3. **When freeing an object** that refers to other objects. In this case, of course, you need to search pointers inside the object every time one of free(), delete or delete[] is called.
 4. **When a function exits**, its local variables are automatically freed. so you need to decrement the reference count of buffers that local variables point to.
 
-### 4.3 More considerations and optimizations
+### 3.3 More considerations and optimizations
 
-#### 4.3.1 When a function exits
+#### 3.3.1 When a function exits
 
 As stated in [section 4.2](#42-when-reference-count-is-decremented), local variables are automatically freed at function exit and thus the reference count of buffers referenced by local pointer variables should be decremented.
 
@@ -148,12 +143,12 @@ To achieve this, the LLVM pass must traverse all users that utilize the return v
 ```c
 // Checks if correct pointer value is stored or returned
 void checkReturnedOrStoredValue(void *RetPtrAddr, void *ComparePtrAddr) {
-    void *RetPtrRefAddr = addr_to_refcnt(RetPtrAddr);
-    void *CompareRefPtrAddr = addr_to_refcnt(ComparePtrAddr);
+    uint8_t RetRefCnt = GetRefCount(RetPtrAddr);
+    uint8_t CompareRefCnt = GetRefCount(ComparePtrAddr);
 
-    if (*RetPtrRefAddr <= 0) {
+    if (RetRefAddr <= 0) {
         return;
-    } else if (RetPtrRefAddr != CompareRefPtrAddr) {
+    } else if (RetRefCnt != CompareRefCnt) {
         Error();
     }
 }
@@ -172,9 +167,9 @@ If the pointer value returned by the CallInst is not utilized by StoreInst nor R
     obviously a memory leak.
 */
 void reportMemoryLeak(void *RetPtrAddr) {
-    void *RetPtrRefAddr = addr_to_refcnt(RetPtrAddr);
+    uint8_t RetRefCnt = GetRefCount(RetPtrAddr);
     /* RetPtrAddr reference heap space and the reference count is zero */
-    if (*RetPtrRef == 127) {
+    if (RetRefCnt == 127) {
         Error();
     }
 }
@@ -210,7 +205,7 @@ if the function's return type is a pointer:
     insert a CallInst to reportMemoryLeak() after the CallInst
 ```
 
-#### 4.3.2 Freed pointer variables (either on the heap or on the stack) should be initialized to NULL
+#### 3.3.2 Freed pointer variables (either on the heap or on the stack) should be initialized to NULL
 
 If any pointer variable is freed (either a variable on the stack or on the heap), it must be initialized to NULL. This is because the PreciseLeakDetector can malfunction when it stores data to an uninitialized variable.
 
@@ -219,7 +214,7 @@ Let's look at an example:
 ```c
 void foo(void *addr)
 {
-    void *p =  addr;
+  void *p =  addr;
 }
 
 int main(void)
@@ -245,10 +240,10 @@ But on the second time foo() is called, the reference count might become zero be
 
 This applies to heap objects in the same manner. Basically when free() is called, PLSAN must scan the freed object to find valid pointers within the freed object, and then it decrements reference counts of buffers referenced by such pointers as explained in the [section 4.2](#42-when-reference-count-is-decremented). After decrementing a reference count, the pointer should be set to NULL for the same reason as pointer variables on the stack.
 
-#### 4.3.3 Not instrumenting when storing to stack variables
+#### 3.3.3 Not instrumenting when storing to stack variables
 I believe it is possible to avoid instrumenting StoreInsts for local variables, but need to think more about it.
 
-### 5. Reporting a memory leak
+### 4. Reporting a memory leak
 
 Let's look at what the report by PLSAN would look like. Below is an example program with a memory leak:
 
@@ -282,7 +277,7 @@ Last reference to the object (<address of the object>) lost at:
 
 It shows 1) **where the object is allocated** and 2) **where the last reference to it is lost.** To show where it is allocated, PLSAN should store stack backtrace when a memory allocation function is called. Printing stack backtrace when the last reference to the object is lost is done by printing it immediately.
 
-## 5.1 Storing stack backtrace when memory is allocated
+## 4.1 Storing stack backtrace when memory is allocated
 
 It is worth noting that **deduplication matters** when the number of allocated memory blocks is huge. de-duplication generally means avoiding duplication of data. For PLSAN, it means not storing the same stack backtrace more than once. It matters for PLSAN because it is extremely common to allocate objects several times, in the same call path.
 
