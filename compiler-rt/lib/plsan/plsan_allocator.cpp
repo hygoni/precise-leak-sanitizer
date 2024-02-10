@@ -225,22 +225,39 @@ static void Deallocate(void *p) {
   RegisterDeallocation(p);
 }
 
-static void *Reallocate(StackTrace *stack, void *ptr_old, uptr new_size,
-                        uptr alignment) {
-  void *ptr_new = Allocate(stack, new_size, alignment);
-  if (ptr_old && ptr_new) {
-    Metadata *old_meta =
-        reinterpret_cast<Metadata *>(allocator.GetMetaData(ptr_old));
-    internal_memcpy(
-        ptr_new, ptr_old,
-        Min(new_size, static_cast<uptr>(old_meta->GetRequestedSize())));
-    if (ptr_old && ptr_old == ptr_new) {
-      Metadata *new_meta =
-          reinterpret_cast<Metadata *>(allocator.GetMetaData(ptr_new));
-      new_meta->SetRefCount(old_meta->GetRefCount());
-    }
+static void *ReportAllocationSizeTooBig(uptr size, const StackTrace *stack) {
+  if (AllocatorMayReturnNull()) {
+    Report("WARNING: PreciseLeakSanitizer failed to allocate 0x%zx bytes\n",
+           size);
+    return nullptr;
   }
-  return ptr_new;
+  ReportAllocationSizeTooBig(size, max_malloc_size, stack);
+}
+
+static void *Reallocate(const StackTrace *stack, void *p, uptr new_size,
+                        uptr alignment) {
+  if (new_size > max_malloc_size) {
+    ReportAllocationSizeTooBig(new_size, stack);
+    return nullptr;
+  }
+  RegisterDeallocation(p);
+
+  void *new_p =
+      allocator.Reallocate(GetAllocatorCache(), p, new_size, alignment);
+  if (new_p)
+    RegisterAllocation(stack, new_p, new_size);
+  else if (new_size != 0)
+    RegisterAllocation(stack, p, new_size);
+
+  if (new_p && new_p == p) {
+    struct Metadata *m = GetMetadata(p);
+    struct Metadata *new_m = GetMetadata(new_p);
+
+    CHECK(m && new_m);
+    new_m->SetRefCount(m->GetRefCount());
+  }
+
+  return new_p;
 }
 
 void *plsan_malloc(uptr size, StackTrace *stack) {
