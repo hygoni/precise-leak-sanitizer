@@ -43,7 +43,7 @@ extern bool plsan_init_is_running;
 void PlsanAllocatorInit();
 void PlsanAllocatorLock();
 void PlsanAllocatorUnlock();
-void UpdateReference(const void *lhs, const void *rhs);
+void UpdateReference(void **lhs, void *rhs);
 bool PtrIsAllocatedFromPlsan(const void *p);
 bool IsSameObject(const void *p, const void *q);
 void IncRefCount(const void *p);

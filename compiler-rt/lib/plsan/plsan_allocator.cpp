@@ -89,9 +89,9 @@ uint8_t GetRefCount(const void *p) {
   return m->GetRefCount();
 }
 
-void UpdateReference(const void *lhs, const void *rhs) {
-  if (PtrIsAllocatedFromPlsan(lhs))
-    DecRefCount(lhs);
+void UpdateReference(void **lhs, void *rhs) {
+  if (PtrIsAllocatedFromPlsan(*lhs))
+    DecRefCount(*lhs);
   if (PtrIsAllocatedFromPlsan(rhs))
     IncRefCount(rhs);
 }
@@ -221,6 +221,15 @@ static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
 
 static void Deallocate(void *p) {
   Metadata *m = GetMetadata(p);
+
+  CHECK(allocator.GetBlockBegin(p) == p);
+  void **ptr = reinterpret_cast<void **>(p);
+  while ((uintptr_t)ptr < (uintptr_t)p + m->GetRequestedSize()) {
+    if (allocator.PointerIsMine(*ptr))
+      DecRefCount(*ptr);
+    ptr++;
+  }
+
   m->SetUnallocated();
   RegisterDeallocation(p);
 }
