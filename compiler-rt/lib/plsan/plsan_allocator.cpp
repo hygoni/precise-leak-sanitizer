@@ -47,15 +47,30 @@ static Metadata *GetMetadata(const void *p) {
   return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(aligned_p));
 }
 
-void IncRefCount(const void *p) { GetMetadata(p)->IncRefCount(); }
+void IncRefCount(const void *p) {
+  struct Metadata *m = GetMetadata(p);
 
-void DecRefCount(const void *p) { GetMetadata(p)->DecRefCount(); }
+  if (!m)
+    return;
+
+  m->IncRefCount();
+}
+
+void DecRefCount(const void *p) {
+  struct Metadata *m = GetMetadata(p);
+
+  if (!m)
+    return;
+
+  m->DecRefCount();
+}
 
 bool PtrIsAllocatedFromPlsan(const void *p) {
   if (!allocator.PointerIsMine(p))
     return false;
 
   struct Metadata *m = GetMetadata(p);
+
   if (!m)
     return false;
   return m->IsAllocated();
@@ -65,7 +80,14 @@ bool IsSameObject(const void *x, const void *y) {
   return GetMetadata(x) == GetMetadata(y);
 }
 
-uint8_t GetRefCount(const void *p) { return GetMetadata(p)->GetRefCount(); }
+uint8_t GetRefCount(const void *p) {
+  struct Metadata *m = GetMetadata(p);
+
+  if (!m)
+    return 0;
+
+  return m->GetRefCount();
+}
 
 void UpdateReference(const void *lhs, const void *rhs) {
   if (PtrIsAllocatedFromPlsan(lhs))
@@ -192,7 +214,7 @@ static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
   void *p = allocator.Allocate(cache, size, alignment);
 
   // PLSAN needs the memory to be always zeroed
-  memset(p, 0, size);
+  internal_memset(p, 0, size);
   RegisterAllocation(stack, p, size);
   return p;
 }

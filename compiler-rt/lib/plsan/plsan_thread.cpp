@@ -122,8 +122,8 @@ void LockThreads() {
 }
 
 void UnlockThreads() {
-  __plsan::plsanThreadRegistry().Unlock();
   __plsan::plsanThreadArgRetval().Unlock();
+  __plsan::plsanThreadRegistry().Unlock();
 }
 
 void EnsureMainThreadIDIsCorrect() { __plsan::EnsureMainThreadIDIsCorrect(); }
