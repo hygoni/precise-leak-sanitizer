@@ -12,8 +12,8 @@
 
 using namespace llvm;
 
-using ArrayAddrInfo =
-    std::tuple</*ArrayStartPointer=*/Value *, /*ArraySize*/ Value *>;
+using VarAddrSizeInfo =
+    std::tuple</*StartPointer=*/Value *, /*SizeInBytes*/ Value *>;
 
 class PreciseLeakSanitizer {
 private:
@@ -37,23 +37,20 @@ private:
   FunctionType *AllocFnTy;
   FunctionType *FreeFnTy;
   FunctionType *StoreFnTy;
-  FunctionType *FreeStackVariablesFnTy;
-  FunctionType *FreeStackArrayFnTy;
+  FunctionType *FreeLocalVariableFnTy;
   FunctionType *LazyCheckFnTy;
   FunctionType *CheckReturnedOrStoredValueFnTy;
   FunctionType *CheckMemoryLeakFnTy;
   FunctionType *MemcpyRefcntFnTy;
   FunctionType *ReallocInstrumentFnTy;
   FunctionCallee StoreFn;
-  FunctionCallee FreeStackVariablesFn;
-  FunctionCallee FreeStackArrayFn;
+  FunctionCallee FreeLocalVariableFn;
   FunctionCallee LazyCheckFn;
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
   FunctionCallee MemcpyRefcntFn;
   StringRef StoreFnName = "__plsan_store";
-  StringRef FreeStackVariablesFnName = "__plsan_free_stack_variables";
-  StringRef FreeStackArrayFnName = "__plsan_free_stack_array";
+  StringRef FreeLocalVariableFnName = "__plsan_free_local_variable";
   StringRef LazyCheckFnName = "__plsan_lazy_check";
   StringRef CheckReturnedOrStoredValueFnName =
       "__plsan_check_returned_or_stored_value";
@@ -76,13 +73,11 @@ public:
   void visitStoreInst(StoreInst &I);
   void visitReturnInst(ReturnInst &I);
   void visitCallInst(CallInst &I);
-  void pushNewLocalPtrVarListStack();
-  void pushNewLocalPtrArrListStack();
+  void pushNewLocalVarListStack();
 
 private:
   PreciseLeakSanitizer &Plsan;
-  std::stack<std::vector<Value *>> LocalPtrVarListStack;
-  std::stack<std::vector<ArrayAddrInfo>> LocalPtrArrListStack;
+  std::stack<std::vector<VarAddrSizeInfo>> LocalVarListStack;
   std::stack<CallInst *> LazyCheckInfoStack;
   Instruction *InstructionTraceTopDown(Instruction *I);
   void visitCallMemset(CallInst &I);

@@ -39,37 +39,12 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
 }
 
-extern "C" LazyCheckInfo *
-__plsan_free_stack_variables(size_t count, void *ret_addr, int is_return, ...) {
-  // We cannot use C++ style variable arguments, because extern keyword for
-  // compatiable with C.
-
-  __sanitizer::Vector<void **> args;
-
-  va_list var_addrs;
-  va_start(var_addrs, is_return);
-
-  for (int i = 0; i < count; i++)
-    args.PushBack(va_arg(var_addrs, void **));
-
-  va_end(var_addrs);
-
+extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
+                                                      size_t size,
+                                                      void *ret_addr,
+                                                      bool is_return) {
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      plsan->free_stack_variables(ret_addr, is_return, args);
-
-  // This return will be changed. It have to contain stack trace data.
-  // __builtin_return_address(0) will return program counter
-  LazyCheckInfo *lazy_check_info = new LazyCheckInfo();
-  lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
-  lazy_check_info->ProgramCounterAddr = __builtin_return_address(0);
-  return lazy_check_info;
-}
-
-extern "C" LazyCheckInfo *__plsan_free_stack_array(void **arr_start_addr,
-                                                   size_t size, void *ret_addr,
-                                                   bool is_return) {
-  __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      plsan->free_stack_array(arr_start_addr, size, ret_addr, is_return);
+      plsan->free_local_variable(arr_start_addr, size, ret_addr, is_return);
 
   // This return will be changed. It have to contain stack trace data.
   // __builtin_return_address(0) will return program counter
@@ -83,7 +58,6 @@ extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
                                    void *ret_addr) {
   __sanitizer::Vector<void *> *lazy_check_addr_list =
       lazy_check_info->RefCountZeroAddrs;
-  void *program_counter = lazy_check_info->ProgramCounterAddr;
 
   for (int i = 0; i < lazy_check_addr_list->Size(); i++) {
     if ((*lazy_check_addr_list)[i] != ret_addr)
@@ -127,59 +101,30 @@ void Plsan::reference_count(void **lhs, void *rhs) {
   check_memory_leak(*lhs);
 }
 
-__sanitizer::Vector<void *> *
-Plsan::free_stack_variables(void *ret_addr, bool is_return,
-                            __sanitizer::Vector<void **> &var_addrs) {
-  // free_stack_variables method calls above return instruction or some method
-  // that pop(restore) stack.
-  // 1. If free_stack_variables calls above return instruction, then "is_return"
-  //    arg is true and decrease stack variables ref count. We have to check
-  //    memory leak in this case. If stack address is same with ret_addr, then
-  //    do not check memory leak. (See Documentation 4.3.1)
-  // 2. If free_stack_variables calls above some method that restore stack, then
-  //    "is_return" arg is false and decrease stack variables ref count. We do
-  //    not check memory leak (lazy check). -> There is some cases that return
-  //    restored stack value.
-  // "var_addrs" arg stores all stack variable addresses.
-  // If is_return is falsem, then this method return target address that check
-  // leak lazily.
+// addr: address of the variable
+// size: size of a variable in bytes
+__sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
+                                                        size_t size,
+                                                        void *ret_addr,
+                                                        bool is_return) {
+  // free_local_variable() method is called just before return instruction
+  // or some method that pops(restore) stack.
+  // 1. If free_local_variable() is called just before return instruction,
+  //    then "is_return" arg is true and decrease local variables' ref count.
+  //    We have to check memory leak in this case. If stack address is same with
+  //    ret_addr, then it is not a memory leak. (See Documentation 4.3.1)
+  // 2. If free_local_variable() is called just before some method that restore
+  //    stack, then "is_return" arg is false and decrease stack variables ref
+  //    count. We do not check memory leak (lazy check). -> There is some cases
+  //    that return restored stack value.
 
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
       new __sanitizer::Vector<void *>();
 
-  for (int i = 0; i < var_addrs.Size(); i++) {
-    void **var_addr = var_addrs[i];
-    DecRefCount(*var_addr);
-    if (!is_return) {
-      RefCountAnalysis analysis_result = leak_analysis(*var_addr);
-      if (analysis_result.exceptTy == RefCountZero)
-        ref_count_zero_addrs->PushBack(*var_addr);
-    } else if (*var_addr != ret_addr) {
-      check_memory_leak(*var_addr);
-    }
-  }
-
-  if (!is_return)
-    return ref_count_zero_addrs;
-  else
-    return nullptr;
-}
-
-__sanitizer::Vector<void *> *Plsan::free_stack_array(void **arr_addr,
-                                                     size_t size,
-                                                     void *ret_addr,
-                                                     bool is_return) {
-  // This method almost same with free_stack_variables method, but it is for
-  // arrays in stack. "arr_addr" arg has array start address "size" arg has
-  // array size
-
-  __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      new __sanitizer::Vector<void *>();
-
-  for (int i = 0; i < size; i++) {
-    void *ptr_value = ptr_array_value(arr_addr, i);
+  for (size_t i = 0; sizeof(void *) * i < size; i++) {
+    void *ptr_value = ptr_array_value(addr, i);
     DecRefCount(ptr_value);
-    if (!is_return) {
+    if (is_return == false) {
       RefCountAnalysis analysis_result = leak_analysis(ptr_value);
       if (analysis_result.exceptTy == RefCountZero)
         ref_count_zero_addrs->PushBack(ptr_value);
@@ -188,7 +133,7 @@ __sanitizer::Vector<void *> *Plsan::free_stack_array(void **arr_addr,
     }
   }
 
-  if (!is_return)
+  if (is_return == false)
     return ref_count_zero_addrs;
   else
     return nullptr;

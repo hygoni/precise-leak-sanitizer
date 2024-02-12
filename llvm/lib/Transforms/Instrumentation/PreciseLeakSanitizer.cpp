@@ -13,7 +13,7 @@ using namespace llvm;
 PreciseLeakSanitizer *Plsan;
 
 PreciseLeakSanVisitor::PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan)
-    : Plsan(Plsan), LocalPtrVarListStack(), LocalPtrArrListStack() {}
+    : Plsan(Plsan), LocalVarListStack() {}
 
 void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
   IRBuilder<> Builder(&I);
@@ -22,21 +22,24 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
   const DataLayout &DL = Plsan.Mod.getDataLayout();
 
   Builder.SetInsertPoint(I.getNextNode());
-  std::optional<TypeSize> size = I.getAllocationSize(DL);
-  LocalPtrVarListStack.top().push_back(&I);
+  std::optional<TypeSize> Size = I.getAllocationSize(DL);
 
   // XXX: Optimize by removing unnecessary instrumentations
-  if (size.has_value()) {
+  if (Size.has_value()) {
     CallInst *InstrumentedInst =
-        Builder.CreateMemSet(&I, Zero, size.value(), MaybeAlign());
+        Builder.CreateMemSet(&I, Zero, Size.value(), MaybeAlign());
     InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
+    Value *SizeValue = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
+                                        DL.getTypeAllocSize(AllocatedType));
+    LocalVarListStack.top().push_back({&I, SizeValue});
   } else if (I.isArrayAllocation()) {
     Value *TypeSize = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
                                        DL.getTypeAllocSize(AllocatedType));
-    Value *Size = Builder.CreateMul(TypeSize, I.getArraySize());
+    Value *SizeValue = Builder.CreateMul(TypeSize, I.getArraySize());
     CallInst *InstrumentedInst =
-        Builder.CreateMemSet(&I, Zero, Size, MaybeAlign());
+        Builder.CreateMemSet(&I, Zero, SizeValue, MaybeAlign());
     InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
+    LocalVarListStack.top().push_back({&I, SizeValue});
   } else {
     report_fatal_error(
         "PreciseLeakSanitizer: Can't get the size of an alloca inst");
@@ -61,8 +64,7 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   if (ReturnValue == NULL)
     ReturnValue = ConstantPointerNull::get(Plsan.VoidPtrTy);
 
-  std::vector<Value *> TopLocalPtrVarList = LocalPtrVarListStack.top();
-  std::vector<ArrayAddrInfo> TopLocalPtrArrList = LocalPtrArrListStack.top();
+  std::vector<VarAddrSizeInfo> TopLocalVarList = LocalVarListStack.top();
 
   // Call __plsan_lazy_check
   while (!LazyCheckInfoStack.empty()) {
@@ -71,27 +73,16 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
     LazyCheckInfoStack.pop();
   }
 
-  // Call __plsan_free_stack_variables
-  ConstantInt *VarCount = Builder.getInt64(TopLocalPtrVarList.size());
-  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), TrueValue);
-  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), ReturnValue);
-  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), VarCount);
-  ArrayRef<Value *> VarArgs = ArrayRef<Value *>(TopLocalPtrVarList);
-  Plsan.CreateCallWithMetaData(Builder, Plsan.FreeStackVariablesFn, VarArgs);
-
-  // Stack pointer restored, then pop local variable stack.
-  LocalPtrVarListStack.pop();
-
   // Call __plsan_free_stack_array, non-variable length array
-  for (ArrayAddrInfo ArrAddrAndSize : TopLocalPtrArrList) {
-    Value *ArrAddr = std::get<0>(ArrAddrAndSize);
-    Value *Size = std::get<1>(ArrAddrAndSize);
-    Plsan.CreateCallWithMetaData(Builder, Plsan.FreeStackArrayFn,
+  for (VarAddrSizeInfo AddrAndSize : TopLocalVarList) {
+    Value *ArrAddr = std::get<0>(AddrAndSize);
+    Value *Size = std::get<1>(AddrAndSize);
+    Plsan.CreateCallWithMetaData(Builder, Plsan.FreeLocalVariableFn,
                                  {ArrAddr, Size, ReturnValue, TrueValue});
   }
 
   // Stack pointer restored, then pop local variable stack.
-  LocalPtrArrListStack.pop();
+  LocalVarListStack.pop();
 }
 
 Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
@@ -162,8 +153,7 @@ void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 void PreciseLeakSanVisitor::visitCallBzero(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitLLVMStacksave(CallInst &I) {
-  LocalPtrVarListStack.push(std::vector<Value *>());
-  LocalPtrArrListStack.push(std::vector<ArrayAddrInfo>());
+  LocalVarListStack.push(std::vector<VarAddrSizeInfo>());
 }
 
 void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
@@ -173,31 +163,19 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
   Value *NullPtr = ConstantPointerNull::get(Plsan.VoidPtrTy);
   Value *FalseValue = ConstantInt::getFalse(Plsan.Ctx);
 
-  std::vector<Value *> TopLocalPtrVarList = LocalPtrVarListStack.top();
-  std::vector<ArrayAddrInfo> TopLocalPtrArrList = LocalPtrArrListStack.top();
+  std::vector<VarAddrSizeInfo> TopLocalVarList = LocalVarListStack.top();
 
-  ConstantInt *VarCount = Builder.getInt64(TopLocalPtrVarList.size());
-  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), FalseValue);
-  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), NullPtr);
-  TopLocalPtrVarList.insert(TopLocalPtrVarList.begin(), VarCount);
-  ArrayRef<Value *> VarArgs = ArrayRef<Value *>(TopLocalPtrVarList);
-  CallInst *FreeStackVariablesFnCall = Plsan.CreateCallWithMetaData(
-      Builder, Plsan.FreeStackVariablesFn, VarArgs);
-  LazyCheckInfoStack.push(FreeStackVariablesFnCall);
-
-  // Stack pointer restored, then pop local variable stack.
-  LocalPtrVarListStack.pop();
-
-  for (ArrayAddrInfo ArrAddrAndSize : TopLocalPtrArrList) {
-    Value *ArrAddr = std::get<0>(ArrAddrAndSize);
-    Value *Size = std::get<1>(ArrAddrAndSize);
-    CallInst *FreeStackArrayFnCall = Plsan.CreateCallWithMetaData(
-        Builder, Plsan.FreeStackArrayFn, {ArrAddr, Size, NullPtr, FalseValue});
-    LazyCheckInfoStack.push(FreeStackArrayFnCall);
+  for (VarAddrSizeInfo T : TopLocalVarList) {
+    Value *ArrAddr = std::get<0>(T);
+    Value *Size = std::get<1>(T);
+    CallInst *FreeLocalVariableFnCall =
+        Plsan.CreateCallWithMetaData(Builder, Plsan.FreeLocalVariableFn,
+                                     {ArrAddr, Size, NullPtr, FalseValue});
+    LazyCheckInfoStack.push(FreeLocalVariableFnCall);
   }
 
   // Stack pointer restored, then pop local variable stack.
-  LocalPtrArrListStack.pop();
+  LocalVarListStack.pop();
 }
 
 bool PreciseLeakSanitizer::initializeModule() {
@@ -214,15 +192,10 @@ bool PreciseLeakSanitizer::initializeModule() {
   StoreFnTy = FunctionType::get(VoidTy, {VoidPtrPtrTy, VoidPtrTy}, false);
   StoreFn = Mod.getOrInsertFunction(StoreFnName, StoreFnTy);
 
-  FreeStackVariablesFnTy =
-      FunctionType::get(VoidPtrTy, {Int64Ty, VoidPtrTy, Int32Ty}, true);
-  FreeStackVariablesFn =
-      Mod.getOrInsertFunction(FreeStackVariablesFnName, FreeStackVariablesFnTy);
-
-  FreeStackArrayFnTy = FunctionType::get(
+  FreeLocalVariableFnTy = FunctionType::get(
       VoidPtrTy, {VoidPtrPtrTy, Int64Ty, VoidPtrTy, BoolTy}, false);
-  FreeStackArrayFn =
-      Mod.getOrInsertFunction(FreeStackArrayFnName, FreeStackArrayFnTy);
+  FreeLocalVariableFn =
+      Mod.getOrInsertFunction(FreeLocalVariableFnName, FreeLocalVariableFnTy);
 
   LazyCheckFnTy = FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy}, false);
   LazyCheckFn = Mod.getOrInsertFunction(LazyCheckFnName, LazyCheckFnTy);
@@ -244,12 +217,8 @@ bool PreciseLeakSanitizer::initializeModule() {
   return true;
 }
 
-void PreciseLeakSanVisitor::pushNewLocalPtrVarListStack() {
-  LocalPtrVarListStack.push(std::vector<Value *>());
-}
-
-void PreciseLeakSanVisitor::pushNewLocalPtrArrListStack() {
-  LocalPtrArrListStack.push(std::vector<ArrayAddrInfo>());
+void PreciseLeakSanVisitor::pushNewLocalVarListStack() {
+  LocalVarListStack.push(std::vector<VarAddrSizeInfo>());
 }
 
 PreciseLeakSanitizer::PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx)
@@ -261,8 +230,7 @@ bool PreciseLeakSanitizer::run() {
 
   for (Function &F : Mod) {
     // Stack pointer saved, then push local variable stack.
-    visitor.pushNewLocalPtrVarListStack();
-    visitor.pushNewLocalPtrArrListStack();
+    visitor.pushNewLocalVarListStack();
     for (BasicBlock &BB : F) {
       for (Instruction &I : BB) {
         if (I.getMetadata(Plsan->PlsanMDName))
