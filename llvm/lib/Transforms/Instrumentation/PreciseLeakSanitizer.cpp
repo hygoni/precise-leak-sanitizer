@@ -1,7 +1,9 @@
 #include "llvm/Transforms/Instrumentation/PreciseLeakSanitizer.h"
 
+#include "llvm/IR/DataLayout.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include <regex>
@@ -15,30 +17,29 @@ PreciseLeakSanVisitor::PreciseLeakSanVisitor(PreciseLeakSanitizer &Plsan)
 
 void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
   IRBuilder<> Builder(&I);
+  Value *Zero = ConstantInt::get(Type::getInt8Ty(Plsan.Ctx), 0);
   Type *AllocatedType = I.getAllocatedType();
-  Value *NullPtr = ConstantPointerNull::get(Plsan.VoidPtrTy);
-  bool IsPointerTy = AllocatedType->isPointerTy();
+  const DataLayout &DL = Plsan.Mod.getDataLayout();
 
   Builder.SetInsertPoint(I.getNextNode());
+  std::optional<TypeSize> size = I.getAllocationSize(DL);
+  LocalPtrVarListStack.top().push_back(&I);
 
-  if (I.isArrayAllocation()) {
-    if (IsPointerTy) {
-      LocalPtrArrListStack.top().push_back(
-          std::make_tuple(&I, I.getArraySize()));
-      CallInst *InstrumentedInst =
-          Builder.CreateMemSet(&I, NullPtr, I.getArraySize(), MaybeAlign());
-      InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
-    }
-  } else if (ArrayType *Arr = dyn_cast<ArrayType>(AllocatedType)) {
-    ConstantInt *ArrSize = Builder.getInt64(Arr->getNumElements());
-    LocalPtrArrListStack.top().push_back(std::make_tuple(&I, ArrSize));
+  // XXX: Optimize by removing unnecessary instrumentations
+  if (size.has_value()) {
     CallInst *InstrumentedInst =
-        Builder.CreateMemSet(&I, NullPtr, ArrSize, MaybeAlign());
+        Builder.CreateMemSet(&I, Zero, size.value(), MaybeAlign());
     InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
-  } else if (IsPointerTy) {
-    LocalPtrVarListStack.top().push_back(&I);
-    StoreInst *InstrumentedInst = Builder.CreateStore(NullPtr, &I);
+  } else if (I.isArrayAllocation()) {
+    Value *TypeSize = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
+                                       DL.getTypeAllocSize(AllocatedType));
+    Value *Size = Builder.CreateMul(TypeSize, I.getArraySize());
+    CallInst *InstrumentedInst =
+        Builder.CreateMemSet(&I, Zero, Size, MaybeAlign());
     InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
+  } else {
+    report_fatal_error(
+        "PreciseLeakSanitizer: Can't get the size of an alloca inst");
   }
 }
 
