@@ -43,12 +43,14 @@ private:
   FunctionType *CheckMemoryLeakFnTy;
   FunctionType *MemcpyRefcntFnTy;
   FunctionType *ReallocInstrumentFnTy;
+  FunctionType *MemsetWrapperFnTy;
   FunctionCallee StoreFn;
   FunctionCallee FreeLocalVariableFn;
   FunctionCallee LazyCheckFn;
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
   FunctionCallee MemcpyRefcntFn;
+  FunctionCallee MemsetWrapperFn;
   StringRef StoreFnName = "__plsan_store";
   StringRef FreeLocalVariableFnName = "__plsan_free_local_variable";
   StringRef LazyCheckFnName = "__plsan_lazy_check";
@@ -56,6 +58,7 @@ private:
       "__plsan_check_returned_or_stored_value";
   StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
   StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
+  StringRef MemsetWrapperFnName = "__plsan_memset_wrapper";
 
   bool initializeModule();
   CallInst *CreateCallWithMetaData(IRBuilder<> &Builder, FunctionCallee Fn,

@@ -26,19 +26,17 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
 
   // XXX: Optimize by removing unnecessary instrumentations
   if (Size.has_value()) {
-    CallInst *InstrumentedInst =
-        Builder.CreateMemSet(&I, Zero, Size.value(), MaybeAlign());
-    InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
     Value *SizeValue = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
                                         DL.getTypeAllocSize(AllocatedType));
+    Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetWrapperFn,
+                                 {&I, Zero, SizeValue});
     LocalVarListStack.top().push_back({&I, SizeValue});
   } else if (I.isArrayAllocation()) {
     Value *TypeSize = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
                                        DL.getTypeAllocSize(AllocatedType));
     Value *SizeValue = Builder.CreateMul(TypeSize, I.getArraySize());
-    CallInst *InstrumentedInst =
-        Builder.CreateMemSet(&I, Zero, SizeValue, MaybeAlign());
-    InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
+    Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetWrapperFn,
+                                 {&I, Zero, SizeValue});
     LocalVarListStack.top().push_back({&I, SizeValue});
   } else {
     report_fatal_error(
@@ -213,6 +211,11 @@ bool PreciseLeakSanitizer::initializeModule() {
       FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
   MemcpyRefcntFn =
       Mod.getOrInsertFunction(MemcpyRefcntFnName, MemcpyRefcntFnTy);
+
+  MemsetWrapperFnTy =
+      FunctionType::get(VoidPtrTy, {VoidPtrTy, Int32Ty, Int64Ty}, false);
+  MemsetWrapperFn =
+      Mod.getOrInsertFunction(MemsetWrapperFnName, MemsetWrapperFnTy);
 
   return true;
 }
