@@ -12,5 +12,5 @@ int main(void) {
   free(ptr);
   int *ptr2 = (int *)malloc(sizeof(int) * 10);
   func();
-  free(ptr);
+  free(ptr2);
 }
