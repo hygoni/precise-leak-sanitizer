@@ -20,17 +20,19 @@ public:
   // Instrumentation function
 
   void reference_count(void **lhs, void *rhs);
-  __sanitizer::Vector<void *> *
-  free_stack_variables(void *ret_addr, bool is_return,
-                       __sanitizer::Vector<void **> &var_addrs);
-  __sanitizer::Vector<void *> *free_stack_array(void **arr_addr, size_t size,
-                                                void *ret_addr, bool is_return);
+  __sanitizer::Vector<void *> *free_local_variable(void **arr_addr, size_t size,
+                                                   void *ret_addr,
+                                                   bool is_return);
   void check_returned_or_stored_value(void *ret_ptr_addr,
                                       void *compare_ptr_addr);
   void check_memory_leak(void *addr);
   void check_memory_leak(RefCountAnalysis analysis_result);
-  void memcpy_refcnt(void *dest, void *src, size_t count);
   RefCountAnalysis leak_analysis(const void *ptr);
+  void *memset_wrapper(void *ptr, int value, size_t num);
+
+  void *plsan_memset(void *ptr, int value, size_t num);
+  void *plsan_memcpy(void *dest, void *src, size_t count);
+  void *plsan_memmove(void *dest, void *src, size_t num);
 
 private:
   PlsanHandler *handler;
@@ -43,7 +45,7 @@ extern bool plsan_init_is_running;
 void PlsanAllocatorInit();
 void PlsanAllocatorLock();
 void PlsanAllocatorUnlock();
-void UpdateReference(const void *lhs, const void *rhs);
+void UpdateReference(void **lhs, void *rhs);
 bool PtrIsAllocatedFromPlsan(const void *p);
 bool IsSameObject(const void *p, const void *q);
 void IncRefCount(const void *p);
@@ -62,6 +64,7 @@ int plsan_posix_memalign(void **memptr, uptr alignment, uptr size,
                          StackTrace *stack);
 void plsan_free(void *ptr);
 void __plsan_init();
+void __plsan_check_memory_leak(void *addr);
 void InitializeInterceptors();
 void InstallAtExitCheckLeaks();
 

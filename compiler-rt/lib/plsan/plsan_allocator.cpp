@@ -13,6 +13,7 @@
 
 #include "plsan_allocator.h"
 #include "lsan/lsan_common.h"
+#include "plsan.h"
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_allocator_checks.h"
 #include "sanitizer_common/sanitizer_allocator_report.h"
@@ -47,15 +48,30 @@ static Metadata *GetMetadata(const void *p) {
   return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(aligned_p));
 }
 
-void IncRefCount(const void *p) { GetMetadata(p)->IncRefCount(); }
+void IncRefCount(const void *p) {
+  struct Metadata *m = GetMetadata(p);
 
-void DecRefCount(const void *p) { GetMetadata(p)->DecRefCount(); }
+  if (!m)
+    return;
+
+  m->IncRefCount();
+}
+
+void DecRefCount(const void *p) {
+  struct Metadata *m = GetMetadata(p);
+
+  if (!m)
+    return;
+
+  m->DecRefCount();
+}
 
 bool PtrIsAllocatedFromPlsan(const void *p) {
   if (!allocator.PointerIsMine(p))
     return false;
 
   struct Metadata *m = GetMetadata(p);
+
   if (!m)
     return false;
   return m->IsAllocated();
@@ -65,11 +81,18 @@ bool IsSameObject(const void *x, const void *y) {
   return GetMetadata(x) == GetMetadata(y);
 }
 
-uint8_t GetRefCount(const void *p) { return GetMetadata(p)->GetRefCount(); }
+uint8_t GetRefCount(const void *p) {
+  struct Metadata *m = GetMetadata(p);
 
-void UpdateReference(const void *lhs, const void *rhs) {
-  if (PtrIsAllocatedFromPlsan(lhs))
-    DecRefCount(lhs);
+  if (!m)
+    return 0;
+
+  return m->GetRefCount();
+}
+
+void UpdateReference(void **lhs, void *rhs) {
+  if (PtrIsAllocatedFromPlsan(*lhs))
+    DecRefCount(*lhs);
   if (PtrIsAllocatedFromPlsan(rhs))
     IncRefCount(rhs);
 }
@@ -192,33 +215,61 @@ static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
   void *p = allocator.Allocate(cache, size, alignment);
 
   // PLSAN needs the memory to be always zeroed
-  memset(p, 0, size);
+  internal_memset(p, 0, size);
   RegisterAllocation(stack, p, size);
   return p;
 }
 
 static void Deallocate(void *p) {
   Metadata *m = GetMetadata(p);
+
+  CHECK(allocator.GetBlockBegin(p) == p);
+  void **ptr = reinterpret_cast<void **>(p);
+  while ((uintptr_t)ptr < (uintptr_t)p + m->GetRequestedSize()) {
+    if (allocator.PointerIsMine(*ptr)) {
+      DecRefCount(*ptr);
+      __plsan_check_memory_leak(*ptr);
+    }
+    ptr++;
+  }
+
   m->SetUnallocated();
   RegisterDeallocation(p);
 }
 
-static void *Reallocate(StackTrace *stack, void *ptr_old, uptr new_size,
-                        uptr alignment) {
-  void *ptr_new = Allocate(stack, new_size, alignment);
-  if (ptr_old && ptr_new) {
-    Metadata *old_meta =
-        reinterpret_cast<Metadata *>(allocator.GetMetaData(ptr_old));
-    internal_memcpy(
-        ptr_new, ptr_old,
-        Min(new_size, static_cast<uptr>(old_meta->GetRequestedSize())));
-    if (ptr_old && ptr_old == ptr_new) {
-      Metadata *new_meta =
-          reinterpret_cast<Metadata *>(allocator.GetMetaData(ptr_new));
-      new_meta->SetRefCount(old_meta->GetRefCount());
-    }
+static void *ReportAllocationSizeTooBig(uptr size, const StackTrace *stack) {
+  if (AllocatorMayReturnNull()) {
+    Report("WARNING: PreciseLeakSanitizer failed to allocate 0x%zx bytes\n",
+           size);
+    return nullptr;
   }
-  return ptr_new;
+  ReportAllocationSizeTooBig(size, max_malloc_size, stack);
+}
+
+static void *Reallocate(const StackTrace *stack, void *p, uptr new_size,
+                        uptr alignment) {
+  if (new_size > max_malloc_size) {
+    ReportAllocationSizeTooBig(new_size, stack);
+    return nullptr;
+  }
+  RegisterDeallocation(p);
+
+  void *new_p =
+      allocator.Reallocate(GetAllocatorCache(), p, new_size, alignment);
+  if (new_p)
+    RegisterAllocation(stack, new_p, new_size);
+  else if (new_size != 0)
+    RegisterAllocation(stack, p, new_size);
+
+  if (new_p && new_p == p) {
+    struct Metadata *m = GetMetadata(p);
+    struct Metadata *new_m = GetMetadata(new_p);
+
+    CHECK(m && new_m);
+    new_m->SetRefCount(m->GetRefCount());
+  }
+
+  return new_p;
 }
 
 void *plsan_malloc(uptr size, StackTrace *stack) {
