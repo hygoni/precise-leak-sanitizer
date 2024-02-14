@@ -184,14 +184,49 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   }
 }
 
-void *Plsan::plsan_memset(void *ptr, int value, size_t num) { return nullptr; }
+void *Plsan::plsan_memset(void *ptr, int value, size_t num) {
+  uptr *ptr_t = (uptr *)ptr;
+  uptr *next_ptr = ptr_t;
+  uptr *end_ptr = ptr_t + (num / 8);
+  while (next_ptr < end_ptr) {
+    plsan->reference_count((void **)next_ptr, nullptr);
+    next_ptr++;
+  }
+  return internal_memset(ptr, value, num);
+}
 
 void *Plsan::plsan_memcpy(void *dest, void *src, size_t count) {
-  return nullptr;
+  int i = 0;
+  int j = 0;
+  int end = count / sizeof(void *);
+  uptr **dest_t = (uptr **)dest;
+  uptr **src_t = (uptr **)src;
+  while (i < end) {
+    void **dest_i = (void **)(dest_t + i);
+    void **src_i = (void **)(src_t + j);
+    if (src_i == (void **)dest_t) {
+      j = 0;
+      src_i = (void **)src_t;
+    }
+    plsan->reference_count(dest_i, *src_i);
+    i++;
+    j++;
+  }
+  return internal_memcpy(dest, src, count);
 }
 
 void *Plsan::plsan_memmove(void *dest, void *src, size_t num) {
-  return nullptr;
+  int i = 0;
+  int end = num / sizeof(void *);
+  uptr **dest_t = (uptr **)dest;
+  uptr **src_t = (uptr **)src;
+  while (i < end) {
+    void **dest_i = (void **)(dest_t + i);
+    void **src_i = (void **)(src_t + i);
+    plsan->reference_count(dest_i, *src_i);
+    i++;
+  }
+  return internal_memmove(dest, src, num);
 }
 
 void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
