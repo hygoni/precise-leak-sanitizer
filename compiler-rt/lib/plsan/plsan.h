@@ -27,9 +27,12 @@ public:
                                       void *compare_ptr_addr);
   void check_memory_leak(void *addr);
   void check_memory_leak(RefCountAnalysis analysis_result);
-  void memcpy_refcnt(void *dest, void *src, size_t count);
   RefCountAnalysis leak_analysis(const void *ptr);
   void *memset_wrapper(void *ptr, int value, size_t num);
+
+  void *plsan_memset(void *ptr, int value, size_t num);
+  void *plsan_memcpy(void *dest, void *src, size_t count);
+  void *plsan_memmove(void *dest, void *src, size_t num);
 
 private:
   PlsanHandler *handler;

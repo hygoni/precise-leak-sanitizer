@@ -3,6 +3,7 @@
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
@@ -41,24 +42,30 @@ private:
   FunctionType *LazyCheckFnTy;
   FunctionType *CheckReturnedOrStoredValueFnTy;
   FunctionType *CheckMemoryLeakFnTy;
-  FunctionType *MemcpyRefcntFnTy;
   FunctionType *ReallocInstrumentFnTy;
   FunctionType *MemsetWrapperFnTy;
+  FunctionType *MemsetFnTy;
+  FunctionType *MemcpyFnTy;
+  FunctionType *MemmoveFnTy;
   FunctionCallee StoreFn;
   FunctionCallee FreeLocalVariableFn;
   FunctionCallee LazyCheckFn;
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
-  FunctionCallee MemcpyRefcntFn;
   FunctionCallee MemsetWrapperFn;
+  FunctionCallee MemsetFn;
+  FunctionCallee MemcpyFn;
+  FunctionCallee MemmoveFn;
   StringRef StoreFnName = "__plsan_store";
   StringRef FreeLocalVariableFnName = "__plsan_free_local_variable";
   StringRef LazyCheckFnName = "__plsan_lazy_check";
   StringRef CheckReturnedOrStoredValueFnName =
       "__plsan_check_returned_or_stored_value";
   StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
-  StringRef MemcpyRefcntFnName = "__plsan_memcpy_refcnt";
   StringRef MemsetWrapperFnName = "__plsan_memset_wrapper";
+  StringRef MemsetFnName = "__plsan_memset";
+  StringRef MemcpyFnName = "__plsan_memcpy";
+  StringRef MemmoveFnName = "__plsan_memmove";
 
   bool initializeModule();
   CallInst *CreateCallWithMetaData(IRBuilder<> &Builder, FunctionCallee Fn,
@@ -76,16 +83,16 @@ public:
   void visitStoreInst(StoreInst &I);
   void visitReturnInst(ReturnInst &I);
   void visitCallInst(CallInst &I);
+  void visitMemIntrinsics(MemIntrinsic &I);
   void pushNewLocalVarListStack();
+  std::vector<MemIntrinsic *> getIntrinToInstrument();
 
 private:
   PreciseLeakSanitizer &Plsan;
   std::stack<std::vector<VarAddrSizeInfo>> LocalVarListStack;
   std::stack<CallInst *> LazyCheckInfoStack;
+  std::vector<MemIntrinsic *> IntrinToInstrument;
   Instruction *InstructionTraceTopDown(Instruction *I);
-  void visitCallMemset(CallInst &I);
-  void visitCallMemcpy(CallInst &I);
-  void visitCallMemmove(CallInst &I);
   void visitCallBzero(CallInst &I);
   void visitLLVMStacksave(CallInst &I);
   void visitLLVMStackrestore(CallInst &I);

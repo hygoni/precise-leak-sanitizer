@@ -81,12 +81,20 @@ extern "C" void __plsan_check_memory_leak(void *addr) {
   plsan->check_memory_leak(addr);
 }
 
-extern "C" void __plsan_memcpy_refcnt(void *dest, void *src, size_t count) {
-  plsan->memcpy_refcnt(dest, src, count);
-}
-
 extern "C" void *__plsan_memset_wrapper(void *ptr, int value, size_t num) {
   return plsan->memset_wrapper(ptr, value, num);
+}
+
+extern "C" void *__plsan_memset(void *ptr, int value, size_t num) {
+  return plsan->plsan_memset(ptr, value, num);
+}
+
+extern "C" void *__plsan_memcpy(void *dest, void *src, size_t count) {
+  return plsan->plsan_memcpy(dest, src, count);
+}
+
+extern "C" void *__plsan_memmove(void *dest, void *src, size_t num) {
+  return plsan->plsan_memmove(dest, src, num);
 }
 
 namespace __plsan {
@@ -95,9 +103,7 @@ Plsan::Plsan() {
   handler = new PlsanHandler();
 }
 
-Plsan::~Plsan() {
-  delete handler;
-}
+Plsan::~Plsan() { delete handler; }
 
 void Plsan::reference_count(void **lhs, void *rhs) {
   // Ref count with Shadow class update_shadow method.
@@ -178,12 +184,14 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   }
 }
 
-void Plsan::memcpy_refcnt(void *dest, void *src, size_t count) {
-  for (int i = 0; i < count / 8; i++) {
-    void *src_i = plsan->ptr_array_value(src, i * 8);
-    void *dest_i = plsan->ptr_array_value(dest, i * 8);
-    plsan->reference_count(&dest_i, src_i);
-  }
+void *Plsan::plsan_memset(void *ptr, int value, size_t num) { return nullptr; }
+
+void *Plsan::plsan_memcpy(void *dest, void *src, size_t count) {
+  return nullptr;
+}
+
+void *Plsan::plsan_memmove(void *dest, void *src, size_t num) {
+  return nullptr;
 }
 
 void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {

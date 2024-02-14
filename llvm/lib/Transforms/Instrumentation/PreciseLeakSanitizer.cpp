@@ -1,6 +1,7 @@
 #include "llvm/Transforms/Instrumentation/PreciseLeakSanitizer.h"
 
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -125,28 +126,40 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
     }
   }
 
-  if (std::regex_match(FuncName.str(),
-                       std::regex("^llvm\\.memcpy\\.[a-zA-Z0-9\\.\\*]*")))
-    visitCallMemcpy(I);
   if (FuncName == "llvm.stacksave")
     visitLLVMStacksave(I);
   if (FuncName == "llvm.stackrestore")
     visitLLVMStackrestore(I);
+
+  if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I))
+    IntrinToInstrument.push_back(MI);
 }
 
-void PreciseLeakSanVisitor::visitCallMemset(CallInst &I) { return; }
-
-void PreciseLeakSanVisitor::visitCallMemcpy(CallInst &I) {
+void PreciseLeakSanVisitor::visitMemIntrinsics(MemIntrinsic &I) {
   IRBuilder<> Builder(&I);
-  Value *MemcpyDestPtrArg = I.getArgOperand(0);
-  Value *MemcpySrcPtrArg = I.getArgOperand(1);
-  Value *MemcpyCountArg = I.getArgOperand(2);
-  Plsan.CreateCallWithMetaData(
-      Builder, Plsan.MemcpyRefcntFn,
-      {MemcpyDestPtrArg, MemcpySrcPtrArg, MemcpyCountArg});
+  if (MemSetInst *Inst = dyn_cast<MemSetInst>(&I)) {
+    Value *MemsetPtrArg = I.getArgOperand(0);
+    Value *MemsetValueArg = I.getArgOperand(1);
+    Value *MemsetNumArg = I.getArgOperand(2);
+    Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetFn,
+                                 {MemsetPtrArg, MemsetValueArg, MemsetNumArg});
+  } else if (MemCpyInst *Inst = dyn_cast<MemCpyInst>(&I)) {
+    Value *MemcpyDestPtrArg = I.getArgOperand(0);
+    Value *MemcpySrcPtrArg = I.getArgOperand(1);
+    Value *MemcpyCountArg = I.getArgOperand(2);
+    Plsan.CreateCallWithMetaData(
+        Builder, Plsan.MemcpyFn,
+        {MemcpyDestPtrArg, MemcpySrcPtrArg, MemcpyCountArg});
+  } else if (MemMoveInst *Inst = dyn_cast<MemMoveInst>(&I)) {
+    Value *MemmoveDestPtrArg = I.getArgOperand(0);
+    Value *MemmoveSrcPtrArg = I.getArgOperand(1);
+    Value *MemmoveNumArg = I.getArgOperand(2);
+    Plsan.CreateCallWithMetaData(
+        Builder, Plsan.MemmoveFn,
+        {MemmoveDestPtrArg, MemmoveSrcPtrArg, MemmoveNumArg});
+  }
+  I.eraseFromParent();
 }
-
-void PreciseLeakSanVisitor::visitCallMemmove(CallInst &I) { return; }
 
 void PreciseLeakSanVisitor::visitCallBzero(CallInst &I) { return; }
 
@@ -207,21 +220,32 @@ bool PreciseLeakSanitizer::initializeModule() {
   CheckMemoryLeakFn =
       Mod.getOrInsertFunction(CheckMemoryLeakFnName, CheckMemoryLeakFnTy);
 
-  MemcpyRefcntFnTy =
-      FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
-  MemcpyRefcntFn =
-      Mod.getOrInsertFunction(MemcpyRefcntFnName, MemcpyRefcntFnTy);
-
   MemsetWrapperFnTy =
       FunctionType::get(VoidPtrTy, {VoidPtrTy, Int32Ty, Int64Ty}, false);
   MemsetWrapperFn =
       Mod.getOrInsertFunction(MemsetWrapperFnName, MemsetWrapperFnTy);
+
+  MemsetFnTy =
+      FunctionType::get(VoidPtrTy, {VoidPtrTy, Int32Ty, Int64Ty}, false);
+  MemsetFn = Mod.getOrInsertFunction(MemsetFnName, MemsetFnTy);
+
+  MemcpyFnTy =
+      FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
+  MemcpyFn = Mod.getOrInsertFunction(MemcpyFnName, MemcpyFnTy);
+
+  MemmoveFnTy =
+      FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy, Int64Ty}, false);
+  MemmoveFn = Mod.getOrInsertFunction(MemmoveFnName, MemmoveFnTy);
 
   return true;
 }
 
 void PreciseLeakSanVisitor::pushNewLocalVarListStack() {
   LocalVarListStack.push(std::vector<VarAddrSizeInfo>());
+}
+
+std::vector<MemIntrinsic *> PreciseLeakSanVisitor::getIntrinToInstrument() {
+  return IntrinToInstrument;
 }
 
 PreciseLeakSanitizer::PreciseLeakSanitizer(Module &Mod, LLVMContext &Ctx)
@@ -242,6 +266,10 @@ bool PreciseLeakSanitizer::run() {
       }
     }
   }
+
+  for (auto *Inst : visitor.getIntrinToInstrument())
+    visitor.visitMemIntrinsics(*Inst);
+
   return false;
 }
 
