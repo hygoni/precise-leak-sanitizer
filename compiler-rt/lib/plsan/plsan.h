@@ -64,6 +64,7 @@ int plsan_posix_memalign(void **memptr, uptr alignment, uptr size,
                          StackTrace *stack);
 void plsan_free(void *ptr);
 void __plsan_init();
+void __plsan_check_memory_leak(void *addr);
 void InitializeInterceptors();
 void InstallAtExitCheckLeaks();
 

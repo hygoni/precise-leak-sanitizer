@@ -13,6 +13,7 @@
 
 #include "plsan_allocator.h"
 #include "lsan/lsan_common.h"
+#include "plsan.h"
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_allocator_checks.h"
 #include "sanitizer_common/sanitizer_allocator_report.h"
@@ -225,8 +226,10 @@ static void Deallocate(void *p) {
   CHECK(allocator.GetBlockBegin(p) == p);
   void **ptr = reinterpret_cast<void **>(p);
   while ((uintptr_t)ptr < (uintptr_t)p + m->GetRequestedSize()) {
-    if (allocator.PointerIsMine(*ptr))
+    if (allocator.PointerIsMine(*ptr)) {
       DecRefCount(*ptr);
+      __plsan_check_memory_leak(*ptr);
+    }
     ptr++;
   }
 

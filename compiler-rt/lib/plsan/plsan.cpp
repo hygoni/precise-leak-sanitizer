@@ -301,6 +301,8 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_inited = true;
 }
 
+void __plsan_check_memory_leak(void *addr) { plsan->check_memory_leak(addr); }
+
 } // namespace __plsan
 
 void __sanitizer::BufferedStackTrace::UnwindImpl(uptr pc, uptr bp,
