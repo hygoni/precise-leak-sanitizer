@@ -1,4 +1,5 @@
 #include "plsan.h"
+#include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "sanitizer_common/sanitizer_libc.h"
 
 #include <cstdarg>
@@ -31,11 +32,13 @@ struct LazyCheckInfo {
 
 /* Initialization routines called before main() */
 __attribute__((constructor)) void __plsan_init() {
-  plsan = new __plsan::Plsan();
+  plsan = (__plsan::Plsan *)__sanitizer::InternalAlloc(sizeof(__plsan::Plsan));
 }
 
 /* finialization routines called after main() */
-__attribute__((destructor)) void __plsan_fini() { delete plsan; }
+__attribute__((destructor)) void __plsan_fini() {
+  __sanitizer::InternalFree(plsan);
+}
 
 extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
@@ -50,7 +53,8 @@ extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
 
   // This return will be changed. It have to contain stack trace data.
   // __builtin_return_address(0) will return program counter
-  LazyCheckInfo *lazy_check_info = new LazyCheckInfo();
+  LazyCheckInfo *lazy_check_info =
+      (LazyCheckInfo *)__sanitizer::InternalAlloc(sizeof(LazyCheckInfo));
   lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
   lazy_check_info->ProgramCounterAddr = __builtin_return_address(0);
   return lazy_check_info;
@@ -68,8 +72,8 @@ extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
     }
   }
 
-  delete lazy_check_addr_list;
-  delete lazy_check_info;
+  __sanitizer::InternalFree(lazy_check_addr_list);
+  __sanitizer::InternalFree(lazy_check_info);
 }
 
 extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
@@ -100,10 +104,10 @@ extern "C" void *__plsan_memmove(void *dest, void *src, size_t num) {
 namespace __plsan {
 
 Plsan::Plsan() {
-  handler = new PlsanHandler();
+  handler = (PlsanHandler *)__sanitizer::InternalAlloc(sizeof(PlsanHandler));
 }
 
-Plsan::~Plsan() { delete handler; }
+Plsan::~Plsan() { __sanitizer::InternalFree(handler); }
 
 void Plsan::reference_count(void **lhs, void *rhs) {
   // Ref count with Shadow class update_shadow method.
@@ -133,7 +137,8 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   //    that return restored stack value.
 
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      new __sanitizer::Vector<void *>();
+      (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
+          sizeof(__sanitizer::Vector<void *>));
 
   for (size_t i = 0; sizeof(void *) * i < size; i++) {
     void *ptr_value = ptr_array_value(addr, i);
