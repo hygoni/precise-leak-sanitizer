@@ -3,7 +3,7 @@
 
 int main(void) {
   int i = 0;
-  while (i < 10000000) {
+  while (i < 1000) {
     int *ptr = (int *)malloc(10 * sizeof(int));
     i++;
   }
