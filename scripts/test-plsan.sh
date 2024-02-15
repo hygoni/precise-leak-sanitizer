@@ -21,9 +21,11 @@ _TP=0
 _FP=0
 _TN=0
 _FN=0
+_CRASH=0
 
 _FP_TC_LIST=()
 _FN_TC_LIST=()
+_CRASH_TC_LIST=()
 
 #############################
 
@@ -33,7 +35,7 @@ _count=0
 check_actual_output() {
   if [[ $1 == *"noleak"* ]]; then
     echo 1
-  else
+  elif [[ $1 == *"leak"* ]]; then
     echo 0
   fi
 }
@@ -70,20 +72,25 @@ for test_case in $test_cases; do
     # execute testcases and save PreciseLeakSanitizer's output.
     start_t=$(date +%s.%N)
     sanitizer_output=$(./$file_base_name 2>&1)
-    testcase_exitcode="$?"
+    testcase_exitcode=$?
     end_t=$(date +%s.%N)
     diff_t=$(echo "$end_t" - "$start_t" | bc -l | cut -c -4)
 
     echo -n " [${diff_t}s]"
 
-    # Is it leak?
-    if [[ $sanitizer_output == *"PreciseLeakSanitizer"* ]];  then
+    if [ "$testcase_exitcode" != "0" ] && [[ $sanitizer_output != *"LeakSanitizer"* ]]; then
+      echo " [Crash] $sanitizer_output"
+      ((_CRASH++))
+      _CRASH_TC_LIST+=("    - $test_case")
+    elif [[ $sanitizer_output == *"PreciseLeakSanitizer"* ]];  then
+      # Is it leak?
       echo " [Leak]"
 
-      if [[ $(check_actual_output "$test_case") == 1 ]]; then # is it no leak?
+      if [[ $(check_actual_output "$test_case") == 1 ]]; then
+        # is it no leak?
         ((_FP++))
         _FP_TC_LIST+=("    - $test_case")
-      else
+      elif [[ $(check_actual_output "$test_case") == 0 ]]; then
         ((_TP++))
       fi
 
@@ -92,14 +99,10 @@ for test_case in $test_cases; do
 
       if [[ $(check_actual_output "$test_case") == 1 ]]; then # is it no leak?
         ((_TN++))
-      else
+      elif [[ $(check_actual_output "$test_case") == 0 ]]; then # is it leak?
         ((_FN++))
         _FN_TC_LIST+=("    - $test_case")
       fi
-    fi
-    if [ "$testcase_exitcode" != "0" ]; then
-      echo "$test_case output :"
-      echo $sanitizer_output
     fi
   else
     echo "Compilation Failed : $test_case"
@@ -119,6 +122,11 @@ done
 echo "True Negative : $_TN"
 echo "False Negative : $_FN"
 for element in "${_FN_TC_LIST[@]}"; do
+    echo "$element"
+done
+
+echo "Crashes : $_CRASH"
+for element in "${_CRASH_TC_LIST[@]}"; do
     echo "$element"
 done
 
