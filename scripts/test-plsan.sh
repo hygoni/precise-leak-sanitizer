@@ -66,12 +66,14 @@ for test_case in $test_cases; do
   # is compilation successed?
   if [ $? -eq 0 ]; then
 
+    echo -n "[$_count] $test_case :"
     # execute testcases and save PreciseLeakSanitizer's output.
     sanitizer_output=$(./$file_base_name 2>&1)
+    testcase_exitcode="$?"
 
     # Is it leak?
     if [[ $sanitizer_output == *"PreciseLeakSanitizer"* ]];  then
-      echo "[$_count] Leak : $test_case"
+      echo " [Leak]"
 
       if [[ $(check_actual_output "$test_case") == 1 ]]; then # is it no leak?
         ((_FP++))
@@ -81,7 +83,7 @@ for test_case in $test_cases; do
       fi
 
     else
-      echo "[$_count] No Leak : $test_case"
+      echo " [No Leak]"
 
       if [[ $(check_actual_output "$test_case") == 1 ]]; then # is it no leak?
         ((_TN++))
@@ -89,6 +91,10 @@ for test_case in $test_cases; do
         ((_FN++))
         _FN_TC_LIST+=("    - $test_case")
       fi
+    fi
+    if [ "$testcase_exitcode" != "0" ]; then
+      echo "$test_case output :"
+      echo $sanitizer_output
     fi
   else
     echo "Compilation Failed : $test_case"
