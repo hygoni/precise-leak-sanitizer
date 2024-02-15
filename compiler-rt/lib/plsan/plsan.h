@@ -1,7 +1,6 @@
 #ifndef PLSAN_H
 #define PLSAN_H
 
-#include "plsan_handler.h"
 #include "plsan_thread.h"
 #if SANITIZER_POSIX
 #include "plsan_posix.h"
@@ -11,6 +10,15 @@
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
 namespace __plsan {
+
+enum AddrType { NonDynAlloc, DynAlloc };
+enum ExceptionType { None, RefCountZero };
+
+struct RefCountAnalysis {
+  AddrType addrTy;
+  ExceptionType exceptTy;
+  __lsan::u32 stack_trace_id;
+};
 
 class Plsan {
 public:
@@ -35,12 +43,13 @@ public:
   void *plsan_memmove(void *dest, void *src, size_t num);
 
 private:
-  PlsanHandler *handler;
   void *ptr_array_value(void *array_start_addr, size_t index);
 };
 
 extern bool plsan_inited;
 extern bool plsan_init_is_running;
+
+void LsanOnDeadlySignal(int signo, void *siginfo, void *context);
 
 void PlsanAllocatorInit();
 void PlsanAllocatorLock();
@@ -51,6 +60,7 @@ bool IsSameObject(const void *p, const void *q);
 void IncRefCount(const void *p);
 void DecRefCount(const void *p);
 uint8_t GetRefCount(const void *p);
+u32 GetAllocTraceID(const void *p);
 
 void *plsan_malloc(uptr size, StackTrace *stack);
 void *plsan_calloc(uptr nmemb, uptr size, StackTrace *stack);

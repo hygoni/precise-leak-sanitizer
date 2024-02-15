@@ -26,7 +26,6 @@ __plsan::Plsan *plsan;
 namespace {
 struct LazyCheckInfo {
   __sanitizer::Vector<void *> *RefCountZeroAddrs;
-  void *ProgramCounterAddr;
 };
 }
 
@@ -56,8 +55,12 @@ extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
   LazyCheckInfo *lazy_check_info =
       (LazyCheckInfo *)__sanitizer::InternalAlloc(sizeof(LazyCheckInfo));
   lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
-  lazy_check_info->ProgramCounterAddr = __builtin_return_address(0);
-  return lazy_check_info;
+  if (is_return) {
+    __sanitizer::InternalFree(lazy_check_info);
+    return nullptr;
+  } else {
+    return lazy_check_info;
+  }
 }
 
 extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
@@ -67,8 +70,8 @@ extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
 
   for (int i = 0; i < lazy_check_addr_list->Size(); i++) {
     if ((*lazy_check_addr_list)[i] != ret_addr) {
-      printf("PreciseLeakSanitizer\n");
-      exit(EXIT_FAILURE);
+      __lsan::setLeakedLoc(
+          __plsan::GetAllocTraceID((*lazy_check_addr_list)[i]));
     }
   }
 
@@ -103,11 +106,9 @@ extern "C" void *__plsan_memmove(void *dest, void *src, size_t num) {
 
 namespace __plsan {
 
-Plsan::Plsan() {
-  handler = (PlsanHandler *)__sanitizer::InternalAlloc(sizeof(PlsanHandler));
-}
+Plsan::Plsan() {}
 
-Plsan::~Plsan() { __sanitizer::InternalFree(handler); }
+Plsan::~Plsan() {}
 
 void Plsan::reference_count(void **lhs, void *rhs) {
   // Ref count with Shadow class update_shadow method.
@@ -152,10 +153,12 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
     }
   }
 
-  if (is_return == false)
+  if (is_return == false) {
     return ref_count_zero_addrs;
-  else
+  } else {
+    __sanitizer::InternalFree(ref_count_zero_addrs);
     return nullptr;
+  }
 }
 
 void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
@@ -178,14 +181,14 @@ void Plsan::check_memory_leak(void *addr) {
   RefCountAnalysis analysis_result = leak_analysis(addr);
   // check exception type
   if (analysis_result.exceptTy == RefCountZero) {
-    handler->exception_check(analysis_result);
+    __lsan::setLeakedLoc(analysis_result.stack_trace_id);
   }
 }
 
 void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   // check exception type
   if (analysis_result.exceptTy == RefCountZero) {
-    handler->exception_check(analysis_result);
+    __lsan::setLeakedLoc(analysis_result.stack_trace_id);
   }
 }
 
@@ -243,19 +246,22 @@ void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
 RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
   AddrType addr_type;
   ExceptionType exception_type;
+  u32 stack_trace_id = 0;
   // If address is dynamic allocated memory
   if (PtrIsAllocatedFromPlsan(ptr)) {
     addr_type = DynAlloc;
-    if (GetRefCount(ptr) == 0)
+    if (GetRefCount(ptr) == 0) {
       exception_type = RefCountZero;
-    else
+      stack_trace_id = GetAllocTraceID(ptr);
+    } else {
       exception_type = None;
+    }
   } else {
     addr_type = NonDynAlloc;
     exception_type = None;
   }
 
-  RefCountAnalysis result = {addr_type, exception_type};
+  RefCountAnalysis result = {addr_type, exception_type, stack_trace_id};
   return result;
 }
 
@@ -279,6 +285,43 @@ void PlsanInstallAtForkHandler() {
 bool plsan_init_is_running;
 bool plsan_inited;
 
+static void InitializeFlags() {
+  // Set all the default values.
+  SetCommonFlagsDefaults();
+  {
+    CommonFlags cf;
+    cf.CopyFrom(*common_flags());
+    cf.external_symbolizer_path = GetEnv("PLSAN_SYMBOLIZER_PATH");
+    cf.malloc_context_size = 30;
+    cf.intercept_tls_get_addr = true;
+    cf.detect_leaks = true;
+    cf.exitcode = 23;
+    OverrideCommonFlags(cf);
+  }
+
+  __lsan::Flags *f = __lsan::flags();
+  f->SetDefaults();
+
+  FlagParser parser;
+  RegisterLsanFlags(&parser, f);
+  RegisterCommonFlags(&parser);
+
+  // Override from user-specified string.
+  const char *plsan_default_options = __lsan_default_options();
+  parser.ParseString(plsan_default_options);
+  parser.ParseStringFromEnv("PLSAN_OPTIONS");
+
+  InitializeCommonFlags();
+
+  if (Verbosity())
+    ReportUnrecognizedFlags();
+
+  if (common_flags()->help)
+    parser.PrintFlagDescriptions();
+
+  __sanitizer_set_report_path(common_flags()->log_path);
+}
+
 __attribute__((constructor(0))) void __plsan_init() {
   CHECK(!plsan_init_is_running);
   if (plsan_inited)
@@ -286,14 +329,19 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_init_is_running = true;
   SanitizerToolName = "PreciseLeakSanitizer";
 
-  InitializeInterceptors();
-  PlsanAllocatorInit();
-
-  InitializeThreads();
-  InitializeMainThread();
-
+  CacheBinaryName();
+  AvoidCVE_2016_2143();
+  InitializeFlags();
   __lsan::InitCommonLsan();
+  PlsanAllocatorInit();
+  InitTlsSize();
+  InitializeInterceptors();
+  InitializeThreads();
+  InstallDeadlySignalHandlers(LsanOnDeadlySignal);
+  InitializeMainThread();
   InstallAtExitCheckLeaks();
+
+  InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
 
   if (common_flags()->detect_leaks) {
     __lsan::ScopedInterceptorDisabler disabler;
@@ -321,3 +369,5 @@ void __sanitizer::BufferedStackTrace::UnwindImpl(uptr pc, uptr bp,
   }
   Unwind(max_depth, pc, bp, nullptr, t->stack_end(), t->stack_begin(), true);
 }
+
+int __plsan_is_turned_on() { return 1; }

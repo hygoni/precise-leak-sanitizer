@@ -90,6 +90,8 @@ uint8_t GetRefCount(const void *p) {
   return m->GetRefCount();
 }
 
+u32 GetAllocTraceID(const void *p) { return GetMetadata(p)->GetAllocTraceId(); }
+
 void UpdateReference(void **lhs, void *rhs) {
   if (PtrIsAllocatedFromPlsan(*lhs))
     DecRefCount(*lhs);

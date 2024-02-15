@@ -208,6 +208,9 @@ struct LeakedObject {
   uptr size;
 };
 
+// key is allocated loc, value is vector of leaked loc
+using LeakedLoc = Vector<Vector<u32>>;
+
 // Aggregates leaks by stack trace prefix.
 class LeakReport {
  public:
@@ -221,12 +224,18 @@ class LeakReport {
 
  private:
   void PrintReportForLeak(uptr index);
+  void PrintReportForPreciseLeak(uptr index);
   void PrintLeakedObjectsForLeak(uptr index);
 
   u32 next_id_ = 0;
   InternalMmapVector<Leak> leaks_;
   InternalMmapVector<LeakedObject> leaked_objects_;
 };
+
+// check the chunk is precise leak or not
+uptr checkPreciseLeak(u32 stack_trace_id);
+
+void setLeakedLoc(u32 alloc_stack_trace_id);
 
 typedef InternalMmapVector<uptr> Frontier;
 
@@ -334,6 +343,9 @@ int __lsan_is_turned_off();
 
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
 const char *__lsan_default_suppressions();
+
+SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE int
+__plsan_is_turned_on();
 
 SANITIZER_INTERFACE_ATTRIBUTE
 void __lsan_register_root_region(const void *p, __lsan::uptr size);
