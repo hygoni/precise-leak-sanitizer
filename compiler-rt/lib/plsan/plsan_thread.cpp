@@ -104,12 +104,10 @@ void GetAdditionalThreadContextPtrsLocked(InternalMmapVector<uptr> *ptrs) {
 }
 
 ThreadRegistry &plsanThreadRegistry() {
-  InitializeThreads();
   return *thread_registry;
 }
 
 ThreadArgRetval &plsanThreadArgRetval() {
-  InitializeThreads();
   return *thread_arg_retval;
 }
 

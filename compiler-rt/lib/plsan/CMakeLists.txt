@@ -3,7 +3,6 @@ include_directories(../../include)
 
 set(PLSAN_SOURCES
     plsan.cpp
-    plsan_handler.cpp
     plsan_allocator.cpp
     plsan_allocation_functions.cpp
     plsan_new_delete.cpp
@@ -15,12 +14,10 @@ set(PLSAN_SOURCES
 
 set(PLSAN_HEADERS
     plsan.h
-    plsan_handler.h
     plsan_internal.h
     plsan_linux.h
     plsan_posix.h
     plsan_thread.h
-    lib/backward.h
 )
 
 set(PLSAN_LINK_FLAGS

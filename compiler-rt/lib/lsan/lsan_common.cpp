@@ -42,6 +42,8 @@ namespace __lsan {
 // also to protect the global list of root regions.
 static Mutex global_mutex;
 
+static LeakedLoc PreciseLeakedLoc;
+
 Flags lsan_flags;
 
 void DisableCounterUnderflow() {
@@ -903,6 +905,8 @@ void LeakReport::ReportTopLeaks(uptr num_leaks_to_report) {
     if (leaks_[i].is_suppressed)
       continue;
     PrintReportForLeak(i);
+    if (__plsan_is_turned_on && __plsan_is_turned_on())
+      PrintReportForPreciseLeak(i);
     leaks_reported++;
     if (leaks_reported == num_leaks_to_report)
       break;
@@ -931,6 +935,24 @@ void LeakReport::PrintReportForLeak(uptr index) {
   }
 }
 
+void LeakReport::PrintReportForPreciseLeak(uptr index) {
+  u32 stack_trace_id = leaks_[index].stack_trace_id;
+
+  uptr i = checkPreciseLeak(stack_trace_id);
+  if (i == PreciseLeakedLoc.Size())
+    return;
+
+  Decorator d;
+  for (uptr j = 1; j != PreciseLeakedLoc[i].Size(); j++) {
+    Printf("%s", d.Error());
+    Printf("    Last reference to the object(s) lost at:\n");
+    Printf("%s", d.Default());
+
+    CHECK(PreciseLeakedLoc[i][j]);
+    StackDepotGet(PreciseLeakedLoc[i][j]).Print();
+  }
+}
+
 void LeakReport::PrintLeakedObjectsForLeak(uptr index) {
   u32 leak_id = leaks_[index].id;
   for (uptr j = 0; j < leaked_objects_.size(); j++) {
@@ -953,6 +975,27 @@ void LeakReport::PrintSummary() {
   summary.append("%zu byte(s) leaked in %zu allocation(s).", bytes,
                  allocations);
   ReportErrorSummary(summary.data());
+}
+
+uptr checkPreciseLeak(u32 stack_trace_id) {
+  uptr i;
+  for (i = 0; i < PreciseLeakedLoc.Size(); i++) {
+    if (PreciseLeakedLoc[i][0] == stack_trace_id)
+      return i;
+  }
+  return i;
+}
+
+void setLeakedLoc(u32 alloc_stack_trace_id) {
+  uptr i = checkPreciseLeak(alloc_stack_trace_id);
+  if (i == PreciseLeakedLoc.Size()) {
+    PreciseLeakedLoc.PushBack(Vector<u32>());
+    PreciseLeakedLoc[i].PushBack(alloc_stack_trace_id);
+  }
+  BufferedStackTrace stack;
+  stack.Unwind(StackTrace::GetCurrentPc(), GET_CURRENT_FRAME(), nullptr, true);
+  u32 stack_trace_id = StackDepotPut(stack);
+  PreciseLeakedLoc[i].PushBack(stack_trace_id);
 }
 
 uptr LeakReport::ApplySuppressions() {
@@ -1092,9 +1135,9 @@ SANITIZER_INTERFACE_WEAK_DEF(const char *, __lsan_default_options, void) {
 }
 
 #if !SANITIZER_SUPPORTS_WEAK_HOOKS
-SANITIZER_INTERFACE_WEAK_DEF(int, __lsan_is_turned_off, void) {
-  return 0;
-}
+SANITIZER_INTERFACE_WEAK_DEF(int, __lsan_is_turned_off, void) { return 0; }
+
+SANITIZER_INTERFACE_WEAK_DEF(void, __plsan_is_turned_on, void) { return 0; }
 
 SANITIZER_INTERFACE_WEAK_DEF(const char *, __lsan_default_suppressions, void) {
   return "";
