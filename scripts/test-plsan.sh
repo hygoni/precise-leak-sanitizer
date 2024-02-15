@@ -77,8 +77,7 @@ for test_case in $test_cases; do
     diff_t=$(echo "$end_t" - "$start_t" | bc -l | cut -c -4)
 
     echo -n " [${diff_t}s]"
-
-    if [ "$testcase_exitcode" != "0" ] && [[ $sanitizer_output != *"LeakSanitizer"* ]]; then
+    if [[ "$testcase_exitcode" != "0" && $sanitizer_output != *"LeakSanitizer"* ]] || [[ $sanitizer_output == *"DEADLYSIGNAL"* ]]; then
       echo " [Crash] $sanitizer_output"
       ((_CRASH++))
       _CRASH_TC_LIST+=("    - $test_case")
