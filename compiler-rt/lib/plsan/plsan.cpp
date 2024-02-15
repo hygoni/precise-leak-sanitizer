@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <pthread.h>
+#include <new>
 
 #include "lsan/lsan_common.h"
 #include "sanitizer_common/sanitizer_atomic.h"
@@ -31,7 +32,8 @@ struct LazyCheckInfo {
 
 /* Initialization routines called before main() */
 __attribute__((constructor)) void __plsan_init() {
-  plsan = (__plsan::Plsan *)__sanitizer::InternalAlloc(sizeof(__plsan::Plsan));
+  void *mem = __sanitizer::InternalAlloc(sizeof(__plsan::Plsan));
+  plsan = new (mem) __plsan::Plsan();
 }
 
 /* finialization routines called after main() */
@@ -54,6 +56,7 @@ extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
   // __builtin_return_address(0) will return program counter
   LazyCheckInfo *lazy_check_info =
       (LazyCheckInfo *)__sanitizer::InternalAlloc(sizeof(LazyCheckInfo));
+  CHECK(lazy_check_info);
   lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
   if (is_return) {
     __sanitizer::InternalFree(lazy_check_info);
@@ -137,20 +140,24 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   //    count. We do not check memory leak (lazy check). -> There is some cases
   //    that return restored stack value.
 
-  __sanitizer::Vector<void *> *ref_count_zero_addrs =
+  void *mem =
       (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
           sizeof(__sanitizer::Vector<void *>));
+  CHECK(mem);
+  __sanitizer::Vector<void *> *ref_count_zero_addrs =
+      new (mem) __sanitizer::Vector<void *>();
 
-  for (size_t i = 0; sizeof(void *) * i < size; i++) {
-    void *ptr_value = ptr_array_value(addr, i);
-    DecRefCount(ptr_value);
+  void **ptr = addr;
+  while (ptr + 1 <= addr + size / (sizeof(void *))) {
+    DecRefCount(ptr);
     if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(ptr_value);
+      RefCountAnalysis analysis_result = leak_analysis(ptr);
       if (analysis_result.exceptTy == RefCountZero)
-        ref_count_zero_addrs->PushBack(ptr_value);
-    } else if (ptr_value != ret_addr) {
-      check_memory_leak(ptr_value);
+        ref_count_zero_addrs->PushBack(ptr);
+    } else if (ptr != ret_addr) {
+      check_memory_leak(ptr);
     }
+    ptr++;
   }
 
   if (is_return == false) {
@@ -235,12 +242,6 @@ void *Plsan::plsan_memmove(void *dest, void *src, size_t num) {
     i++;
   }
   return internal_memmove(dest, src, num);
-}
-
-void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
-  // void * type cannot add with integer. So casting to int *.
-  int64_t *array_addr = (int64_t *)array_start_addr;
-  return (void *)(*(array_addr + index));
 }
 
 RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
