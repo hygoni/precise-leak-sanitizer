@@ -51,7 +51,7 @@ for test_case in $test_cases; do
 
   compile_options="-fsanitize=precise-leak"
   compile_options+=" -g -Wno-everything"
-  link_options=" -ldw -lstdc++"
+  link_options="-lstdc++"
   # setting up compile options.
   if [ "$file_extension" == "cpp" ]; then
     compiler=build/bin/clang++
@@ -68,8 +68,13 @@ for test_case in $test_cases; do
 
     echo -n "[$_count] $test_case :"
     # execute testcases and save PreciseLeakSanitizer's output.
+    start_t=$(date +%s.%N)
     sanitizer_output=$(./$file_base_name 2>&1)
     testcase_exitcode="$?"
+    end_t=$(date +%s.%N)
+    diff_t=$(echo "$end_t" - "$start_t" | bc -l | cut -c -4)
+
+    echo -n " [${diff_t}s]"
 
     # Is it leak?
     if [[ $sanitizer_output == *"PreciseLeakSanitizer"* ]];  then

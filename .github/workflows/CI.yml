@@ -22,8 +22,8 @@ jobs:
         run:  wget https://raw.githubusercontent.com/llvm/llvm-project/main/clang/tools/clang-format/clang-format-diff.py
       - name: Run clang-format-diff.py
         run: git diff -U0 --no-color origin/main HEAD | python3 ./clang-format-diff.py -p1
-      - name: Install libdw-dev
-        run: sudo apt install -y libdw-dev
+      - name: Install necessary packages
+        run: sudo apt install -y bc
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
