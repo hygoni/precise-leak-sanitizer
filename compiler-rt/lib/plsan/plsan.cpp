@@ -147,16 +147,17 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
       new (mem) __sanitizer::Vector<void *>();
 
-  for (size_t i = 0; sizeof(void *) * i < size; i++) {
-    void *ptr_value = ptr_array_value(addr, i);
-    DecRefCount(ptr_value);
+  void **ptr = addr;
+  while (ptr + 1 <= addr + size / (sizeof(void *))) {
+    DecRefCount(ptr);
     if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(ptr_value);
+      RefCountAnalysis analysis_result = leak_analysis(ptr);
       if (analysis_result.exceptTy == RefCountZero)
-        ref_count_zero_addrs->PushBack(ptr_value);
-    } else if (ptr_value != ret_addr) {
-      check_memory_leak(ptr_value);
+        ref_count_zero_addrs->PushBack(ptr);
+    } else if (ptr != ret_addr) {
+      check_memory_leak(ptr);
     }
+    ptr++;
   }
 
   if (is_return == false) {
@@ -241,12 +242,6 @@ void *Plsan::plsan_memmove(void *dest, void *src, size_t num) {
     i++;
   }
   return internal_memmove(dest, src, num);
-}
-
-void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
-  // void * type cannot add with integer. So casting to int *.
-  int64_t *array_addr = (int64_t *)array_start_addr;
-  return (void *)(*(array_addr + index));
 }
 
 RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
