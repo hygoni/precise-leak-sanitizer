@@ -41,11 +41,11 @@ static Metadata *GetMetadata(const void *p) {
   if (!allocator.PointerIsMine(p))
     return nullptr;
 
-  if (allocator.FromPrimary(p))
-    return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
+  p = allocator.GetBlockBegin(p);
+  if (!p)
+    return nullptr;
 
-  void *aligned_p = (void *)((uptr)p & ~(GetPageSizeCached() - 1));
-  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(aligned_p));
+  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
 }
 
 void IncRefCount(const void *p) {
