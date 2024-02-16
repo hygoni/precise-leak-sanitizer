@@ -147,16 +147,18 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
       new (mem) __sanitizer::Vector<void *>();
 
-  for (size_t i = 0; sizeof(void *) * i < size; i++) {
-    void *ptr_value = ptr_array_value(addr, i);
-    DecRefCount(ptr_value);
+  void **pp = addr;
+  while (pp + 1 <= addr + size / (sizeof(void *))) {
+    void *ptr = *pp;
+    DecRefCount(ptr);
     if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(ptr_value);
+      RefCountAnalysis analysis_result = leak_analysis(ptr);
       if (analysis_result.exceptTy == RefCountZero)
-        ref_count_zero_addrs->PushBack(ptr_value);
-    } else if (ptr_value != ret_addr) {
-      check_memory_leak(ptr_value);
+        ref_count_zero_addrs->PushBack(ptr);
+    } else if (!IsSameObject(ptr, ret_addr)){
+      check_memory_leak(ptr);
     }
+    pp++;
   }
 
   if (is_return == false) {
