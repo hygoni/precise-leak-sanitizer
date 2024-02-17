@@ -75,7 +75,19 @@ bool PtrIsAllocatedFromPlsan(const void *p) {
 }
 
 bool IsSameObject(const void *x, const void *y) {
-  return GetMetadata(x) == GetMetadata(y);
+  if (!x || !y)
+    return false;
+
+  void *begin = allocator.GetBlockBegin(x);
+  if (!begin)
+    return false;
+
+  struct Metadata *m =
+      reinterpret_cast<struct Metadata *>(allocator.GetMetaData(begin));
+  if (!m)
+    return false;
+
+  return begin <= y && (uptr)y < (uptr)begin + m->GetRequestedSize();
 }
 
 uint8_t GetRefCount(const void *p) {
