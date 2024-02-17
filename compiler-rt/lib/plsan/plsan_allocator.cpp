@@ -38,9 +38,6 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 }
 
 static Metadata *GetMetadata(const void *p) {
-  if (!allocator.PointerIsMine(p))
-    return nullptr;
-
   p = allocator.GetBlockBegin(p);
   if (!p)
     return nullptr;
