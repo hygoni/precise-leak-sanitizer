@@ -60,7 +60,7 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   Value *TrueValue = ConstantInt::getTrue(Plsan.Ctx);
 
   // if return value is void
-  if (ReturnValue == NULL)
+  if (ReturnValue == NULL || !ReturnValue->getType()->isPointerTy())
     ReturnValue = ConstantPointerNull::get(Plsan.VoidPtrTy);
 
   std::vector<VarAddrSizeInfo> TopLocalVarList = LocalVarListStack.top();
@@ -73,12 +73,25 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   }
 
   // Call __plsan_free_stack_array, non-variable length array
-  for (VarAddrSizeInfo AddrAndSize : TopLocalVarList) {
-    Value *ArrAddr = std::get<0>(AddrAndSize);
-    Value *Size = std::get<1>(AddrAndSize);
-    Plsan.CreateCallWithMetaData(Builder, Plsan.FreeLocalVariableFn,
-                                 {ArrAddr, Size, ReturnValue, TrueValue});
+  std::vector<Value *> AddrAndSize;
+
+  for (VarAddrSizeInfo AddrInfo : TopLocalVarList) {
+    Value *ArrAddr = std::get<0>(AddrInfo);
+    Value *Size = std::get<1>(AddrInfo);
+    AddrAndSize.push_back(ArrAddr);
+    AddrAndSize.push_back(Size);
   }
+
+  ConstantInt *VarCount = Builder.getInt64(AddrAndSize.size() / 2);
+
+  AddrAndSize.insert(AddrAndSize.begin(), VarCount);
+  AddrAndSize.insert(AddrAndSize.begin(), TrueValue);
+  AddrAndSize.insert(AddrAndSize.begin(), ReturnValue);
+
+  ArrayRef<Value *> VarArgs = ArrayRef<Value *>(AddrAndSize);
+
+  Plsan.CreateCallWithMetaData(Builder, Plsan.FreeLocalVariableFn,
+                                 {VarArgs});
 
   // Stack pointer restored, then pop local variable stack.
   LocalVarListStack.pop();
@@ -176,14 +189,27 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
 
   std::vector<VarAddrSizeInfo> TopLocalVarList = LocalVarListStack.top();
 
+  std::vector<Value *> AddrAndSize;
+
   for (VarAddrSizeInfo T : TopLocalVarList) {
     Value *ArrAddr = std::get<0>(T);
     Value *Size = std::get<1>(T);
-    CallInst *FreeLocalVariableFnCall =
-        Plsan.CreateCallWithMetaData(Builder, Plsan.FreeLocalVariableFn,
-                                     {ArrAddr, Size, NullPtr, FalseValue});
-    LazyCheckInfoStack.push(FreeLocalVariableFnCall);
+    AddrAndSize.push_back(ArrAddr);
+    AddrAndSize.push_back(Size);
   }
+
+  ConstantInt *VarCount = Builder.getInt64(AddrAndSize.size() / 2);
+
+  AddrAndSize.insert(AddrAndSize.begin(), VarCount);
+  AddrAndSize.insert(AddrAndSize.begin(), FalseValue);
+  AddrAndSize.insert(AddrAndSize.begin(), NullPtr);
+
+  ArrayRef<Value *> VarArgs = ArrayRef<Value *>(AddrAndSize);
+
+  CallInst *FreeLocalVariableFnCall =
+      Plsan.CreateCallWithMetaData(Builder, Plsan.FreeLocalVariableFn,
+                                     {VarArgs});
+  LazyCheckInfoStack.push(FreeLocalVariableFnCall);
 
   // Stack pointer restored, then pop local variable stack.
   LocalVarListStack.pop();
@@ -204,7 +230,7 @@ bool PreciseLeakSanitizer::initializeModule() {
   StoreFn = Mod.getOrInsertFunction(StoreFnName, StoreFnTy);
 
   FreeLocalVariableFnTy = FunctionType::get(
-      VoidPtrTy, {VoidPtrPtrTy, Int64Ty, VoidPtrTy, BoolTy}, false);
+      VoidPtrTy, {VoidPtrTy, BoolTy, Int64Ty}, true);
   FreeLocalVariableFn =
       Mod.getOrInsertFunction(FreeLocalVariableFnName, FreeLocalVariableFnTy);
 

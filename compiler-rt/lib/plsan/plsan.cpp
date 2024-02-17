@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <pthread.h>
+#include <stdarg.h>
 #include <new>
 
 #include "lsan/lsan_common.h"
@@ -45,12 +46,28 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
 }
 
-extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
-                                                      size_t size,
-                                                      void *ret_addr,
-                                                      bool is_return) {
+extern "C" LazyCheckInfo *__plsan_free_local_variable(void *ret_addr,
+                                                      bool is_return,
+                                                      size_t count,
+                                                      ...) {
+  __sanitizer::Vector<__plsan::LocalAddrInfo> args;
+ 
+  va_list local_addr_infos;
+  va_start(local_addr_infos, count);
+
+  for (int i = 0; i < count; i++) {
+    void **pptr = va_arg(local_addr_infos, void **);
+    size_t size = va_arg(local_addr_infos, size_t);
+    __plsan::LocalAddrInfo info;
+    info.arr_start_addr = pptr;
+    info.size = size;
+    args.PushBack(info);
+  }
+
+  va_end(local_addr_infos);
+    
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      plsan->free_local_variable(arr_start_addr, size, ret_addr, is_return);
+      plsan->free_local_variable(ret_addr, is_return, args);
 
   // This return will be changed. It have to contain stack trace data.
   // __builtin_return_address(0) will return program counter
@@ -58,6 +75,7 @@ extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
       (LazyCheckInfo *)__sanitizer::InternalAlloc(sizeof(LazyCheckInfo));
   CHECK(lazy_check_info);
   lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
+
   if (is_return) {
     __sanitizer::InternalFree(lazy_check_info);
     return nullptr;
@@ -125,10 +143,9 @@ void Plsan::reference_count(void **lhs, void *rhs) {
 
 // addr: address of the variable
 // size: size of a variable in bytes
-__sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
-                                                        size_t size,
-                                                        void *ret_addr,
-                                                        bool is_return) {
+__sanitizer::Vector<void *> *Plsan::free_local_variable(void *ret_addr,
+                                                        bool is_return,
+                                                        __sanitizer::Vector<LocalAddrInfo> &local_addr_infos) {
   // free_local_variable() method is called just before return instruction
   // or some method that pops(restore) stack.
   // 1. If free_local_variable() is called just before return instruction,
@@ -147,18 +164,23 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
       new (mem) __sanitizer::Vector<void *>();
 
-  void **pp = addr;
-  while (pp + 1 <= addr + size / (sizeof(void *))) {
-    void *ptr = *pp;
-    DecRefCount(ptr);
-    if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(ptr);
-      if (analysis_result.exceptTy == RefCountZero)
-        ref_count_zero_addrs->PushBack(ptr);
-    } else if (!IsSameObject(ptr, ret_addr)){
-      check_memory_leak(ptr);
+  for (int i = 0; i < local_addr_infos.Size(); i++) {
+    LocalAddrInfo local_addr_info = local_addr_infos[i];
+    // printf("addr: %p\n", local_addr_info.arr_start_addr);
+    // printf("size: %d\n", local_addr_info.size);
+    void **pp = local_addr_info.arr_start_addr;
+    while (pp + 1 <= local_addr_info.arr_start_addr + local_addr_info.size / (sizeof(void *))) {
+      void *ptr = *pp;
+      DecRefCount(ptr);
+      if (is_return == false) {
+        RefCountAnalysis analysis_result = leak_analysis(ptr);
+        if (analysis_result.exceptTy == RefCountZero)
+          ref_count_zero_addrs->PushBack(ptr);
+      } else if (!IsSameObject(ptr, ret_addr)){
+        check_memory_leak(ptr);
+      }
+      pp++;
     }
-    pp++;
   }
 
   if (is_return == false) {

@@ -20,6 +20,11 @@ struct RefCountAnalysis {
   __lsan::u32 stack_trace_id;
 };
 
+typedef struct {
+  void **arr_start_addr;
+  size_t size;
+} LocalAddrInfo;
+
 class Plsan {
 public:
   Plsan();
@@ -28,9 +33,9 @@ public:
   // Instrumentation function
 
   void reference_count(void **lhs, void *rhs);
-  __sanitizer::Vector<void *> *free_local_variable(void **arr_addr, size_t size,
-                                                   void *ret_addr,
-                                                   bool is_return);
+  __sanitizer::Vector<void *> *free_local_variable(void *ret_addr,
+                                                   bool is_return,
+                                                   __sanitizer::Vector<LocalAddrInfo> &local_addr_infos);
   void check_returned_or_stored_value(void *ret_ptr_addr,
                                       void *compare_ptr_addr);
   void check_memory_leak(void *addr);
