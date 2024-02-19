@@ -29,8 +29,6 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
 
   // XXX: Optimize by removing unnecessary instrumentations
   if (Size.has_value()) {
-    ConstantInt *SizeValue = ConstantInt::get(
-        Type::getInt64Ty(Plsan.Ctx), DL.getTypeAllocSize(AllocatedType));
     if (Ty->isIntegerTy() || Ty->isFloatingPointTy())
       return;
     if (Ty->isArrayTy()) {
@@ -38,9 +36,11 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
       if (ElementType->isIntegerTy() || ElementType->isFloatingPointTy())
         return;
     }
-    // TODO: Do not instrument a struct without pointer elements (recursively)
-    Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetWrapperFn,
-                                 {&I, Zero, SizeValue});
+    Value *SizeValue = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
+                                        DL.getTypeAllocSize(AllocatedType));
+    CallInst *InstrumentedInst =
+        Builder.CreateMemSet(&I, Zero, SizeValue, MaybeAlign());
+    InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
     LocalVarListStack.top().push_back({&I, SizeValue});
   } else if (I.isArrayAllocation()) {
     Value *TypeSize = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
@@ -51,8 +51,9 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
       if (ElementType->isIntegerTy() || ElementType->isFloatingPointTy())
         return;
     }
-    Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetWrapperFn,
-                                 {&I, Zero, SizeValue});
+    CallInst *InstrumentedInst =
+        Builder.CreateMemSet(&I, Zero, SizeValue, MaybeAlign());
+    InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
     LocalVarListStack.top().push_back({&I, SizeValue});
   } else {
     report_fatal_error(
@@ -234,11 +235,6 @@ bool PreciseLeakSanitizer::initializeModule() {
   CheckMemoryLeakFnTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
   CheckMemoryLeakFn =
       Mod.getOrInsertFunction(CheckMemoryLeakFnName, CheckMemoryLeakFnTy);
-
-  MemsetWrapperFnTy =
-      FunctionType::get(VoidPtrTy, {VoidPtrTy, Int32Ty, Int64Ty}, false);
-  MemsetWrapperFn =
-      Mod.getOrInsertFunction(MemsetWrapperFnName, MemsetWrapperFnTy);
 
   MemsetFnTy =
       FunctionType::get(VoidPtrTy, {VoidPtrTy, Int32Ty, Int64Ty}, false);

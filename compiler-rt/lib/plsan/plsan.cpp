@@ -91,10 +91,6 @@ extern "C" void __plsan_check_memory_leak(void *addr) {
   plsan->check_memory_leak(addr);
 }
 
-extern "C" void *__plsan_memset_wrapper(void *ptr, int value, size_t num) {
-  return plsan->memset_wrapper(ptr, value, num);
-}
-
 extern "C" void *__plsan_memset(void *ptr, int value, size_t num) {
   return plsan->plsan_memset(ptr, value, num);
 }
@@ -271,11 +267,6 @@ RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
 
   RefCountAnalysis result = {addr_type, exception_type, stack_trace_id};
   return result;
-}
-
-// This function is needed to not intercept our instrumented memset.
-void *Plsan::memset_wrapper(void *ptr, int value, size_t num) {
-  return internal_memset(ptr, value, num);
 }
 
 void PlsanInstallAtForkHandler() {

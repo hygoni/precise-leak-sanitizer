@@ -43,7 +43,6 @@ private:
   FunctionType *CheckReturnedOrStoredValueFnTy;
   FunctionType *CheckMemoryLeakFnTy;
   FunctionType *ReallocInstrumentFnTy;
-  FunctionType *MemsetWrapperFnTy;
   FunctionType *MemsetFnTy;
   FunctionType *MemcpyFnTy;
   FunctionType *MemmoveFnTy;
@@ -52,7 +51,6 @@ private:
   FunctionCallee LazyCheckFn;
   FunctionCallee CheckReturnedOrStoredValueFn;
   FunctionCallee CheckMemoryLeakFn;
-  FunctionCallee MemsetWrapperFn;
   FunctionCallee MemsetFn;
   FunctionCallee MemcpyFn;
   FunctionCallee MemmoveFn;
@@ -62,7 +60,6 @@ private:
   StringRef CheckReturnedOrStoredValueFnName =
       "__plsan_check_returned_or_stored_value";
   StringRef CheckMemoryLeakFnName = "__plsan_check_memory_leak";
-  StringRef MemsetWrapperFnName = "__plsan_memset_wrapper";
   StringRef MemsetFnName = "__plsan_memset";
   StringRef MemcpyFnName = "__plsan_memcpy";
   StringRef MemmoveFnName = "__plsan_memmove";
