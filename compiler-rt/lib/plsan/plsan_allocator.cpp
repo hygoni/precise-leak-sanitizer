@@ -63,8 +63,8 @@ void DecRefCount(const void *p) {
   m->DecRefCount();
 }
 
-bool PtrIsAllocatedFromPlsan(const void *p) {
-  if (!allocator.PointerIsMine(p))
+bool inline PtrIsAllocatedFromPlsan(const void *p) {
+  if (!PointerIsFromPrimary(reinterpret_cast<uptr>(p)))
     return false;
 
   struct Metadata *m = GetMetadata(p);
