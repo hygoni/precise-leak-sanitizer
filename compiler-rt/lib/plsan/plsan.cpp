@@ -7,8 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <pthread.h>
 #include <new>
+#include <pthread.h>
 
 #include "lsan/lsan_common.h"
 #include "sanitizer_common/sanitizer_atomic.h"
@@ -140,12 +140,13 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   //    count. We do not check memory leak (lazy check). -> There is some cases
   //    that return restored stack value.
 
-  void *mem =
-      (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
-          sizeof(__sanitizer::Vector<void *>));
-  CHECK(mem);
-  __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      new (mem) __sanitizer::Vector<void *>();
+  __sanitizer::Vector<void *> *ref_count_zero_addrs = nullptr;
+  if (is_return == false) {
+    void *mem = (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
+        sizeof(__sanitizer::Vector<void *>));
+    CHECK(mem);
+    ref_count_zero_addrs = new (mem) __sanitizer::Vector<void *>();
+  }
 
   void **pp = addr;
   while (pp + 1 <= addr + size / (sizeof(void *))) {
@@ -164,7 +165,6 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   if (is_return == false) {
     return ref_count_zero_addrs;
   } else {
-    __sanitizer::InternalFree(ref_count_zero_addrs);
     return nullptr;
   }
 }

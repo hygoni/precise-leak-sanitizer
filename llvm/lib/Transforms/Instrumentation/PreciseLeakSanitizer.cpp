@@ -1,5 +1,6 @@
 #include "llvm/Transforms/Instrumentation/PreciseLeakSanitizer.h"
 
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -24,11 +25,20 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
 
   Builder.SetInsertPoint(I.getNextNode());
   std::optional<TypeSize> Size = I.getAllocationSize(DL);
+  Type *Ty = I.getAllocatedType();
 
   // XXX: Optimize by removing unnecessary instrumentations
   if (Size.has_value()) {
-    Value *SizeValue = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
-                                        DL.getTypeAllocSize(AllocatedType));
+    ConstantInt *SizeValue = ConstantInt::get(
+        Type::getInt64Ty(Plsan.Ctx), DL.getTypeAllocSize(AllocatedType));
+    if (Ty->isIntegerTy() || Ty->isFloatingPointTy())
+      return;
+    if (Ty->isArrayTy()) {
+      Type *ElementType = Ty->getArrayElementType();
+      if (ElementType->isIntegerTy() || ElementType->isFloatingPointTy())
+        return;
+    }
+    // TODO: Do not instrument a struct without pointer elements (recursively)
     Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetWrapperFn,
                                  {&I, Zero, SizeValue});
     LocalVarListStack.top().push_back({&I, SizeValue});
@@ -36,6 +46,11 @@ void PreciseLeakSanVisitor::visitAllocaInst(AllocaInst &I) {
     Value *TypeSize = ConstantInt::get(Type::getInt64Ty(Plsan.Ctx),
                                        DL.getTypeAllocSize(AllocatedType));
     Value *SizeValue = Builder.CreateMul(TypeSize, I.getArraySize());
+    if (Ty->isArrayTy()) {
+      Type *ElementType = Ty->getArrayElementType();
+      if (ElementType->isIntegerTy() || ElementType->isFloatingPointTy())
+        return;
+    }
     Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetWrapperFn,
                                  {&I, Zero, SizeValue});
     LocalVarListStack.top().push_back({&I, SizeValue});

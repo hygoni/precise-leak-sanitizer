@@ -67,21 +67,28 @@ struct PlsanMapUnmapCallback {
   void OnUnmap(uptr p, uptr size) const {}
 };
 
-struct AP64 {
-  static const uptr kSpaceBeg = ~0ULL;
-#if SANITIZER_LINUX && !SANITIZER_ANDROID
-  static const uptr kSpaceSize = 0x40000000000ULL; // 4T.
-  typedef __sanitizer::DefaultSizeClassMap SizeClassMap;
+#if SANITIZER_APPLE
+const uptr kAllocatorSpace = 0x600000000000ULL;
+const uptr kAllocatorSize  = 0x40000000000ULL;  // 4T.
 #else
-  static const uptr kSpaceSize = 0x2000000000ULL; // 128G.
-  typedef __sanitizer::VeryDenseSizeClassMap SizeClassMap;
+const uptr kAllocatorSpace = 0x500000000000ULL;
+const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
 #endif
+const uptr kAllocatorEnd = kAllocatorSpace + kAllocatorSize;
 
+struct AP64 {
+  static const uptr kSpaceBeg = kAllocatorSpace;
+  static const uptr kSpaceSize = kAllocatorSize; // 4T.
+  typedef __sanitizer::DefaultSizeClassMap SizeClassMap;
   static const uptr kMetadataSize = sizeof(Metadata);
   using AddressSpaceView = LocalAddressSpaceView;
   static const uptr kFlags = 0;
   typedef PlsanMapUnmapCallback MapUnmapCallback;
 };
+
+bool inline PointerIsFromPrimary(uptr ptr) {
+  return (kAllocatorSize <= ptr && ptr < kAllocatorEnd);
+}
 
 typedef SizeClassAllocator64<AP64> PrimaryAllocator;
 typedef CombinedAllocator<PrimaryAllocator> Allocator;
