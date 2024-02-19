@@ -36,7 +36,6 @@ public:
   void check_memory_leak(void *addr);
   void check_memory_leak(RefCountAnalysis analysis_result);
   RefCountAnalysis leak_analysis(const void *ptr);
-  void *memset_wrapper(void *ptr, int value, size_t num);
 
   void *plsan_memset(void *ptr, int value, size_t num);
   void *plsan_memcpy(void *dest, void *src, size_t count);
