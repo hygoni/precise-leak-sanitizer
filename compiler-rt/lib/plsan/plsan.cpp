@@ -45,10 +45,13 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
 }
 
-extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
-                                                      size_t size,
-                                                      void *ret_addr,
-                                                      bool is_return) {
+extern "C" LazyCheckInfo *
+__plsan_free_local_variable(void **arr_start_addr, size_t size, void *ret_addr,
+                            bool is_return, bool is_allocated) {
+
+  if (!is_allocated)
+    return nullptr;
+
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
       plsan->free_local_variable(arr_start_addr, size, ret_addr, is_return);
 

@@ -1,6 +1,7 @@
 #ifndef PRECISE_LEAK_SANITIZER_H
 #define PRECISE_LEAK_SANITIZER_H
 
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -15,6 +16,10 @@ using namespace llvm;
 
 using VarAddrSizeInfo =
     std::tuple</*StartPointer=*/Value *, /*SizeInBytes*/ Value *>;
+
+using VarAddrSizeInfoForBuiltinAlloca =
+    std::tuple</*StartPointer=*/Value *, /*SizeInBytes*/ Value *,
+               /*IsExecuted*/ Value *>;
 
 class PreciseLeakSanitizer {
 private:
@@ -82,12 +87,16 @@ public:
   void visitCallInst(CallInst &I);
   void visitMemIntrinsics(MemIntrinsic &I);
   void pushNewLocalVarListStack();
+  void pushNewBuiltinAllocaStack();
+  void setCurrentFunctionEntryBlock(BasicBlock &BB);
   std::vector<MemIntrinsic *> getIntrinToInstrument();
 
 private:
   PreciseLeakSanitizer &Plsan;
   std::stack<std::vector<VarAddrSizeInfo>> LocalVarListStack;
+  std::stack<std::vector<VarAddrSizeInfoForBuiltinAlloca>> BuiltinAllocaStack;
   std::stack<CallInst *> LazyCheckInfoStack;
+  BasicBlock *CurrentFunctionEntryBlock;
   std::vector<MemIntrinsic *> IntrinToInstrument;
   Instruction *InstructionTraceTopDown(Instruction *I);
   void visitCallBzero(CallInst &I);
