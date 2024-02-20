@@ -126,9 +126,10 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
     Value *ArrAddr = std::get<0>(AddrAndSize);
     Value *Size = std::get<1>(AddrAndSize);
     Value *IsExecuted = std::get<2>(AddrAndSize);
+    LoadInst *IsExecutedLoad = Builder.CreateLoad(Plsan.BoolTy, IsExecuted);
     Plsan.CreateCallWithMetaData(
         Builder, Plsan.FreeLocalVariableFn,
-        {ArrAddr, Size, ReturnValue, TrueValue, IsExecuted});
+        {ArrAddr, Size, ReturnValue, TrueValue, IsExecutedLoad});
   }
 
   // Stack pointer restored, then pop local variable stack.
@@ -246,9 +247,10 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
     Value *ArrAddr = std::get<0>(AddrAndSize);
     Value *Size = std::get<1>(AddrAndSize);
     Value *IsExecuted = std::get<2>(AddrAndSize);
+    LoadInst *IsExecutedLoad = Builder.CreateLoad(Plsan.BoolTy, IsExecuted);
     CallInst *FreeLocalVariableFnCall = Plsan.CreateCallWithMetaData(
         Builder, Plsan.FreeLocalVariableFn,
-        {ArrAddr, Size, NullPtr, FalseValue, IsExecuted});
+        {ArrAddr, Size, NullPtr, FalseValue, IsExecutedLoad});
     LazyCheckInfoStack.push(FreeLocalVariableFnCall);
   }
 
