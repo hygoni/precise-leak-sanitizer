@@ -37,7 +37,7 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(AllocatorCache);
 }
 
-static Metadata *GetMetadata(const void *p) {
+Metadata *GetMetadata(const void *p) {
   p = allocator.GetBlockBegin(p);
   if (!p)
     return nullptr;
@@ -45,62 +45,44 @@ static Metadata *GetMetadata(const void *p) {
   return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
 }
 
-void IncRefCount(const void *p) {
-  struct Metadata *m = GetMetadata(p);
-
-  if (!m)
+void IncRefCount(Metadata *metadata) {
+  if (!metadata)
     return;
 
-  m->IncRefCount();
+  metadata->IncRefCount();
 }
 
-void DecRefCount(const void *p) {
-  struct Metadata *m = GetMetadata(p);
-
-  if (!m)
+void DecRefCount(Metadata *metadata) {
+  if (!metadata)
     return;
 
-  m->DecRefCount();
+  metadata->DecRefCount();
 }
 
-bool PtrIsAllocatedFromPlsan(const void *p) {
-  struct Metadata *m = GetMetadata(p);
-
-  if (!m)
+bool PtrIsAllocatedFromPlsan(Metadata *metadata) {
+  if (!metadata)
     return false;
-  return m->IsAllocated();
+  return metadata->IsAllocated();
 }
 
-bool IsSameObject(const void *x, const void *y) {
-  if (!x || !y)
+bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
+  if (!x || !y || !metadata)
     return false;
 
   void *begin = allocator.GetBlockBegin(x);
   if (!begin)
     return false;
 
-  struct Metadata *m =
-      reinterpret_cast<struct Metadata *>(allocator.GetMetaData(begin));
-  if (!m)
-    return false;
-
-  return begin <= y && (uptr)y < (uptr)begin + m->GetRequestedSize();
+  return begin <= y && (uptr)y < (uptr)begin + metadata->GetRequestedSize();
 }
 
-uint8_t GetRefCount(const void *p) {
-  struct Metadata *m = GetMetadata(p);
+uint8_t GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
-  if (!m)
-    return 0;
+u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 
-  return m->GetRefCount();
-}
-
-u32 GetAllocTraceID(const void *p) { return GetMetadata(p)->GetAllocTraceId(); }
-
-void UpdateReference(void **lhs, void *rhs) {
-    DecRefCount(*lhs);
-    IncRefCount(rhs);
+void UpdateReference(Metadata *lhs_metadata, Metadata *rhs_metadata) {
+  DecRefCount(lhs_metadata);
+  IncRefCount(rhs_metadata);
 }
 
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
@@ -123,7 +105,7 @@ bool Metadata::IsAllocated() const { return state >> 7; }
 
 inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
-inline u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
+u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
 
 inline uint8_t Metadata::GetRefCount() const { return state & ~(1 << 7); }
 
@@ -233,10 +215,8 @@ static void Deallocate(void *p) {
   CHECK(allocator.GetBlockBegin(p) == p);
   void **ptr = reinterpret_cast<void **>(p);
   while ((uintptr_t)ptr < (uintptr_t)p + m->GetRequestedSize()) {
-    if (allocator.PointerIsMine(*ptr)) {
-      DecRefCount(*ptr);
-      __plsan_check_memory_leak(*ptr);
-    }
+    DecRefCount(m);
+    __plsan_check_memory_leak(*ptr);
     ptr++;
   }
 

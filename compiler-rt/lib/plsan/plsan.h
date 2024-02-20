@@ -1,11 +1,13 @@
 #ifndef PLSAN_H
 #define PLSAN_H
 
+#include "lsan/lsan_common.h"
 #include "plsan_thread.h"
 #if SANITIZER_POSIX
 #include "plsan_posix.h"
 #endif
 
+#include "plsan_allocator.h"
 #include "plsan_internal.h"
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
@@ -17,7 +19,7 @@ enum ExceptionType { None, RefCountZero };
 struct RefCountAnalysis {
   AddrType addrTy;
   ExceptionType exceptTy;
-  __lsan::u32 stack_trace_id;
+  u32 stack_trace_id;
 };
 
 class Plsan {
@@ -33,9 +35,9 @@ public:
                                                    bool is_return);
   void check_returned_or_stored_value(void *ret_ptr_addr,
                                       void *compare_ptr_addr);
-  void check_memory_leak(void *addr);
+  void check_memory_leak(Metadata *metadata);
   void check_memory_leak(RefCountAnalysis analysis_result);
-  RefCountAnalysis leak_analysis(const void *ptr);
+  RefCountAnalysis leak_analysis(Metadata *metadata);
 
   void *plsan_memset(void *ptr, int value, size_t num);
   void *plsan_memcpy(void *dest, void *src, size_t count);
@@ -53,13 +55,13 @@ void LsanOnDeadlySignal(int signo, void *siginfo, void *context);
 void PlsanAllocatorInit();
 void PlsanAllocatorLock();
 void PlsanAllocatorUnlock();
-void UpdateReference(void **lhs, void *rhs);
-bool PtrIsAllocatedFromPlsan(const void *p);
-bool IsSameObject(const void *p, const void *q);
-void IncRefCount(const void *p);
-void DecRefCount(const void *p);
-uint8_t GetRefCount(const void *p);
-u32 GetAllocTraceID(const void *p);
+void UpdateReference(Metadata *lhs_metadata, Metadata *rhs_metadata);
+bool PtrIsAllocatedFromPlsan(Metadata *metadata);
+bool IsSameObject(Metadata *metadata, const void *p, const void *q);
+void IncRefCount(Metadata *metadata);
+void DecRefCount(Metadata *metadata);
+uint8_t GetRefCount(Metadata *metadata);
+u32 GetAllocTraceID(Metadata *metadata);
 
 void *plsan_malloc(uptr size, StackTrace *stack);
 void *plsan_calloc(uptr nmemb, uptr size, StackTrace *stack);

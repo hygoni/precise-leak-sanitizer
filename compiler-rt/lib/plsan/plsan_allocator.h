@@ -47,7 +47,7 @@ public:
 
   inline bool IsAllocated() const;
   inline u64 GetRequestedSize() const;
-  inline u32 GetAllocTraceId() const;
+  u32 GetAllocTraceId() const;
   inline u32 GetAllocThreadId() const;
   inline void SetLsanTag(__lsan::ChunkTag tag);
   inline __lsan::ChunkTag GetLsanTag() const;
@@ -56,6 +56,8 @@ public:
   inline void IncRefCount();
   inline void DecRefCount();
 };
+
+Metadata *GetMetadata(const void *p);
 
 static const uptr kMaxAllowedMallocSize = 1UL << 40;
 
