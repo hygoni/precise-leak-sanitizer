@@ -248,8 +248,8 @@ void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
 }
 
 RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
-  AddrType addr_type;
-  ExceptionType exception_type;
+  AddrType addr_type = NonDynAlloc;
+  ExceptionType exception_type = None;
   u32 stack_trace_id = 0;
   // If address is dynamic allocated memory
   if (PtrIsAllocatedFromPlsan(ptr)) {
@@ -257,12 +257,7 @@ RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
     if (GetRefCount(ptr) == 0) {
       exception_type = RefCountZero;
       stack_trace_id = GetAllocTraceID(ptr);
-    } else {
-      exception_type = None;
     }
-  } else {
-    addr_type = NonDynAlloc;
-    exception_type = None;
   }
 
   RefCountAnalysis result = {addr_type, exception_type, stack_trace_id};
