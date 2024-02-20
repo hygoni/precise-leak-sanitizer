@@ -63,10 +63,7 @@ void DecRefCount(const void *p) {
   m->DecRefCount();
 }
 
-bool inline PtrIsAllocatedFromPlsan(const void *p) {
-  if (!PointerIsFromPrimary(reinterpret_cast<uptr>(p)))
-    return false;
-
+bool PtrIsAllocatedFromPlsan(const void *p) {
   struct Metadata *m = GetMetadata(p);
 
   if (!m)
@@ -102,9 +99,7 @@ uint8_t GetRefCount(const void *p) {
 u32 GetAllocTraceID(const void *p) { return GetMetadata(p)->GetAllocTraceId(); }
 
 void UpdateReference(void **lhs, void *rhs) {
-  if (PtrIsAllocatedFromPlsan(*lhs))
     DecRefCount(*lhs);
-  if (PtrIsAllocatedFromPlsan(rhs))
     IncRefCount(rhs);
 }
 
