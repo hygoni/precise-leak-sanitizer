@@ -87,7 +87,7 @@ struct AP64 {
 };
 
 bool inline PointerIsFromPrimary(uptr ptr) {
-  return (kAllocatorSize <= ptr && ptr < kAllocatorEnd);
+  return (kAllocatorSpace <= ptr && ptr < kAllocatorEnd);
 }
 
 typedef SizeClassAllocator64<AP64> PrimaryAllocator;
