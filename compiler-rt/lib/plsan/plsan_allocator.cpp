@@ -225,11 +225,9 @@ static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
   AllocatorCache *cache = GetAllocatorCache();
   void *p = allocator.Allocate(cache, size, alignment);
 
-  if (p) {
-    // PLSAN needs the memory to be always zeroed
-    internal_memset(p, 0, size);
-    RegisterAllocation(stack, p, size);
-  }
+  // PLSAN needs the memory to be always zeroed
+  internal_memset(p, 0, size);
+  RegisterAllocation(stack, p, size);
   return p;
 }
 
