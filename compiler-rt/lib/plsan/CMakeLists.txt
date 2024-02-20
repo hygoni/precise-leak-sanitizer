@@ -31,7 +31,6 @@ set(PLSAN_CFLAGS
 #    ${COMPILER_RT_COMMON_CFLAGS}
     ${COMPILER_RT_CXX_CFLAGS}
 #    ${SANITIZER_COMMON_CFLAGS}
-    -fexceptions -g -O0
 )
 
 # Allow the PLSAN runtime to reference LLVM headers.
