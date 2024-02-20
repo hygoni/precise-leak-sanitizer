@@ -99,7 +99,7 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   Value *TrueValue = ConstantInt::getTrue(Plsan.Ctx);
 
   // if return value is void
-  if (ReturnValue == NULL)
+  if (ReturnValue == NULL || !ReturnValue->getType()->isPointerTy())
     ReturnValue = ConstantPointerNull::get(Plsan.VoidPtrTy);
 
   std::vector<VarAddrSizeInfo> TopLocalVarList = LocalVarListStack.top();
