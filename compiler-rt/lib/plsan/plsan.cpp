@@ -1,4 +1,5 @@
 #include "plsan.h"
+#include "plsan_allocator.h"
 #include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "sanitizer_common/sanitizer_libc.h"
 
@@ -25,8 +26,13 @@
 __plsan::Plsan *plsan;
 
 namespace {
+
 struct LazyCheckInfo {
   __sanitizer::Vector<void *> *RefCountZeroAddrs;
+};
+
+struct LazyCheckMetadataInfo {
+  __sanitizer::Vector<__plsan::Metadata> *RefCountZeroMetadataList;
 };
 }
 
@@ -76,8 +82,9 @@ extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
 
   for (int i = 0; i < lazy_check_addr_list->Size(); i++) {
     if ((*lazy_check_addr_list)[i] != ret_addr) {
-      __lsan::setLeakedLoc(
-          __plsan::GetAllocTraceID((*lazy_check_addr_list)[i]));
+      __plsan::Metadata *metadata =
+          __plsan::GetMetadata((*lazy_check_addr_list)[i]);
+      __lsan::setLeakedLoc(metadata->GetAllocTraceId());
     }
   }
 
@@ -91,7 +98,8 @@ extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
 }
 
 extern "C" void __plsan_check_memory_leak(void *addr) {
-  plsan->check_memory_leak(addr);
+  __plsan::Metadata *metadata = __plsan::GetMetadata(addr);
+  plsan->check_memory_leak(metadata);
 }
 
 extern "C" void *__plsan_memset(void *ptr, int value, size_t num) {
@@ -118,8 +126,11 @@ void Plsan::reference_count(void **lhs, void *rhs) {
   // leak. update_shadow method only decrease lhs's ref count, no problem with
   // checking only lhs.
 
-  UpdateReference(lhs, rhs);
-  check_memory_leak(*lhs);
+  Metadata *lhs_metadata = GetMetadata(*lhs);
+  Metadata *rhs_metadata = GetMetadata(rhs);
+
+  UpdateReference(lhs_metadata, rhs_metadata);
+  check_memory_leak(lhs_metadata);
 }
 
 // addr: address of the variable
@@ -150,13 +161,14 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
   void **pp = addr;
   while (pp + 1 <= addr + size / (sizeof(void *))) {
     void *ptr = *pp;
-    DecRefCount(ptr);
+    Metadata *metadata = GetMetadata(ptr);
+    DecRefCount(metadata);
     if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(ptr);
+      RefCountAnalysis analysis_result = leak_analysis(metadata);
       if (analysis_result.exceptTy == RefCountZero)
         ref_count_zero_addrs->PushBack(ptr);
-    } else if (!IsSameObject(ptr, ret_addr)){
-      check_memory_leak(ptr);
+    } else if (!IsSameObject(metadata, ptr, ret_addr)) {
+      check_memory_leak(metadata);
     }
     pp++;
   }
@@ -175,17 +187,19 @@ void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
   // have to check if return pointer point dyn alloc memory and ref count is 0.
   // For more information, see doumentation 4.3.1 When a function exits
 
-  RefCountAnalysis analysis_result = leak_analysis(ret_ptr_addr);
+  Metadata *metadata = GetMetadata(ret_ptr_addr);
+
+  RefCountAnalysis analysis_result = leak_analysis(metadata);
   // check address type
   if (analysis_result.addrTy == NonDynAlloc) {
     return;
-  } else if (!IsSameObject(ret_ptr_addr, compare_ptr_addr)) {
+  } else if (!IsSameObject(metadata, ret_ptr_addr, compare_ptr_addr)) {
     check_memory_leak(analysis_result);
   }
 }
 
-void Plsan::check_memory_leak(void *addr) {
-  RefCountAnalysis analysis_result = leak_analysis(addr);
+void Plsan::check_memory_leak(Metadata *metadata) {
+  RefCountAnalysis analysis_result = leak_analysis(metadata);
   // check exception type
   if (analysis_result.exceptTy == RefCountZero) {
     __lsan::setLeakedLoc(analysis_result.stack_trace_id);
@@ -250,16 +264,16 @@ void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
   return (void *)(*(array_addr + index));
 }
 
-RefCountAnalysis Plsan::leak_analysis(const void *ptr) {
+RefCountAnalysis Plsan::leak_analysis(Metadata *metadata) {
   AddrType addr_type;
   ExceptionType exception_type;
   u32 stack_trace_id = 0;
   // If address is dynamic allocated memory
-  if (PtrIsAllocatedFromPlsan(ptr)) {
+  if (metadata) {
     addr_type = DynAlloc;
-    if (GetRefCount(ptr) == 0) {
+    if (GetRefCount(metadata) == 0) {
       exception_type = RefCountZero;
-      stack_trace_id = GetAllocTraceID(ptr);
+      stack_trace_id = GetAllocTraceID(metadata);
     } else {
       exception_type = None;
     }
@@ -356,7 +370,10 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_inited = true;
 }
 
-void __plsan_check_memory_leak(void *addr) { plsan->check_memory_leak(addr); }
+void __plsan_check_memory_leak(void *addr) {
+  Metadata *metadata = GetMetadata(addr);
+  plsan->check_memory_leak(metadata);
+}
 
 } // namespace __plsan
 
