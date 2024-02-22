@@ -378,8 +378,8 @@ uptr PointsIntoChunk(void *p) {
       reinterpret_cast<uptr>(__plsan::allocator.GetBlockBeginFastLocked(p));
   if (!chunk)
     return 0;
-  __plsan::Metadata *m =
-      reinterpret_cast<__plsan::Metadata *>(__plsan::allocator.GetMetaData(p));
+  __plsan::Metadata *m = reinterpret_cast<__plsan::Metadata *>(
+      __plsan::allocator.GetMetaData(reinterpret_cast<void *>(chunk)));
   if (!m || !m->IsAllocated())
     return 0;
   if (addr < chunk + m->GetRequestedSize())
