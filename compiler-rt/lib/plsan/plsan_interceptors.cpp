@@ -45,9 +45,9 @@ static void *ThreadStartFunc(void *arg) {
                  nullptr);
   InternalFree(arg);
   auto self = GetThreadSelf();
-  auto args = ThreadArgRetval().GetArgs(self);
+  auto args = GetThreadArgRetval().GetArgs(self);
   void *retval = (*args.routine)(args.arg_retval);
-  ThreadArgRetval().Finish(self, retval);
+  GetThreadArgRetval().Finish(self, retval);
   return retval;
 }
 
@@ -68,7 +68,7 @@ INTERCEPTOR(int, pthread_create, void *thread, void *attr,
   __lsan::ScopedInterceptorDisabler lsan_disabler;
 
   int result;
-  ThreadArgRetval().Create(detached, {callback, param}, [&]() -> uptr {
+  GetThreadArgRetval().Create(detached, {callback, param}, [&]() -> uptr {
     result = REAL(pthread_create)(thread, attr, &ThreadStartFunc, A);
     return result ? 0 : *(uptr *)(thread);
   });
@@ -80,7 +80,7 @@ INTERCEPTOR(int, pthread_create, void *thread, void *attr,
 
 INTERCEPTOR(int, pthread_join, void *thread, void **retval) {
   int result;
-  ThreadArgRetval().Join((uptr)thread, [&]() {
+  GetThreadArgRetval().Join((uptr)thread, [&]() {
     result = REAL(pthread_join)(thread, retval);
     return !result;
   });
@@ -89,7 +89,7 @@ INTERCEPTOR(int, pthread_join, void *thread, void **retval) {
 
 INTERCEPTOR(int, pthread_detach, void *thread) {
   int result;
-  ThreadArgRetval().Detach((uptr)thread, [&]() {
+  GetThreadArgRetval().Detach((uptr)thread, [&]() {
     result = REAL(pthread_detach)(thread);
     return !result;
   });
@@ -97,14 +97,14 @@ INTERCEPTOR(int, pthread_detach, void *thread) {
 }
 
 INTERCEPTOR(int, pthread_exit, void *retval) {
-  ThreadArgRetval().Finish(GetThreadSelf(), retval);
+  GetThreadArgRetval().Finish(GetThreadSelf(), retval);
   return REAL(pthread_exit)(retval);
 }
 
 #if SANITIZER_GLIBC
 INTERCEPTOR(int, pthread_tryjoin_np, void *thread, void **ret) {
   int result;
-  ThreadArgRetval().Join((uptr)thread, [&]() {
+  GetThreadArgRetval().Join((uptr)thread, [&]() {
     result = REAL(pthread_tryjoin_np)(thread, ret);
     return !result;
   });
@@ -114,7 +114,7 @@ INTERCEPTOR(int, pthread_tryjoin_np, void *thread, void **ret) {
 INTERCEPTOR(int, pthread_timedjoin_np, void *thread, void **ret,
             const struct timespec *abstime) {
   int result;
-  ThreadArgRetval().Join((uptr)thread, [&]() {
+  GetThreadArgRetval().Join((uptr)thread, [&]() {
     result = REAL(pthread_timedjoin_np)(thread, ret, abstime);
     return !result;
   });
