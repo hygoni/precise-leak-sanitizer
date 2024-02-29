@@ -21,11 +21,13 @@
 #include "sanitizer_common/sanitizer_common.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_ring_buffer.h"
-#include <cstdint>
 
 #if !defined(__aarch64__) && !defined(__x86_64__)
 #error Unsupported platform
 #endif
+
+#define PLSAN_REFCOUNT_MAX 255
+#define PLSAN_REFCOUNT_MIN 0
 
 namespace __plsan {
 struct Metadata {
@@ -51,8 +53,8 @@ public:
   inline u32 GetAllocThreadId() const;
   inline void SetLsanTag(__lsan::ChunkTag tag);
   inline __lsan::ChunkTag GetLsanTag() const;
-  inline uint8_t GetRefCount() const;
-  inline void SetRefCount(uint8_t val);
+  inline u8 GetRefCount() const;
+  inline void SetRefCount(u8 val);
   inline void IncRefCount();
   inline void DecRefCount();
 };

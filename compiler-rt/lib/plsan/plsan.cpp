@@ -3,12 +3,7 @@
 #include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "sanitizer_common/sanitizer_libc.h"
 
-#include <cstdarg>
-#include <cstddef>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <new>
+#include "sanitizer_common/sanitizer_placement_new.h"
 #include <pthread.h>
 
 #include "lsan/lsan_common.h"
@@ -51,9 +46,10 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   plsan->reference_count(lhs, rhs);
 }
 
-extern "C" LazyCheckInfo *
-__plsan_free_local_variable(void **arr_start_addr, size_t size, void *ret_addr,
-                            bool is_return, bool is_allocated) {
+extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
+                                                      uptr size, void *ret_addr,
+                                                      bool is_return,
+                                                      bool is_allocated) {
 
   if (!is_allocated)
     return nullptr;
@@ -102,15 +98,15 @@ extern "C" void __plsan_check_memory_leak(void *addr) {
   plsan->check_memory_leak(metadata);
 }
 
-extern "C" void *__plsan_memset(void *ptr, int value, size_t num) {
+extern "C" void *__plsan_memset(void *ptr, int value, uptr num) {
   return plsan->plsan_memset(ptr, value, num);
 }
 
-extern "C" void *__plsan_memcpy(void *dest, void *src, size_t count) {
+extern "C" void *__plsan_memcpy(void *dest, void *src, uptr count) {
   return plsan->plsan_memcpy(dest, src, count);
 }
 
-extern "C" void *__plsan_memmove(void *dest, void *src, size_t num) {
+extern "C" void *__plsan_memmove(void *dest, void *src, uptr num) {
   return plsan->plsan_memmove(dest, src, num);
 }
 
@@ -135,8 +131,7 @@ void Plsan::reference_count(void **lhs, void *rhs) {
 
 // addr: address of the variable
 // size: size of a variable in bytes
-__sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr,
-                                                        size_t size,
+__sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr, uptr size,
                                                         void *ret_addr,
                                                         bool is_return) {
   // free_local_variable() method is called just before return instruction
@@ -213,7 +208,7 @@ void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
   }
 }
 
-void *Plsan::plsan_memset(void *ptr, int value, size_t num) {
+void *Plsan::plsan_memset(void *ptr, int value, uptr num) {
   uptr *ptr_t = (uptr *)ptr;
   uptr *next_ptr = ptr_t;
   uptr *end_ptr = ptr_t + (num / 8);
@@ -224,7 +219,7 @@ void *Plsan::plsan_memset(void *ptr, int value, size_t num) {
   return internal_memset(ptr, value, num);
 }
 
-void *Plsan::plsan_memcpy(void *dest, void *src, size_t count) {
+void *Plsan::plsan_memcpy(void *dest, void *src, uptr count) {
   int i = 0;
   int j = 0;
   int end = count / sizeof(void *);
@@ -244,7 +239,7 @@ void *Plsan::plsan_memcpy(void *dest, void *src, size_t count) {
   return internal_memcpy(dest, src, count);
 }
 
-void *Plsan::plsan_memmove(void *dest, void *src, size_t num) {
+void *Plsan::plsan_memmove(void *dest, void *src, uptr num) {
   int i = 0;
   int end = num / sizeof(void *);
   uptr **dest_t = (uptr **)dest;
@@ -256,12 +251,6 @@ void *Plsan::plsan_memmove(void *dest, void *src, size_t num) {
     i++;
   }
   return internal_memmove(dest, src, num);
-}
-
-void *Plsan::ptr_array_value(void *array_start_addr, size_t index) {
-  // void * type cannot add with integer. So casting to int *.
-  int64_t *array_addr = (int64_t *)array_start_addr;
-  return (void *)(*(array_addr + index));
 }
 
 RefCountAnalysis Plsan::leak_analysis(Metadata *metadata) {
