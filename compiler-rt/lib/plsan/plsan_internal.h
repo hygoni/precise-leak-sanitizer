@@ -1,9 +1,6 @@
 #ifndef PLSAN_INTERNAL_H
 #define PLSAN_INTERNAL_H
 
-#include <cstddef>
-#include <cstdint>
-
 #include "interception/interception.h"
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_allocator_dlsym.h"

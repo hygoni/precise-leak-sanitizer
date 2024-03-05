@@ -23,7 +23,6 @@
 #include "sanitizer_common/sanitizer_errno_codes.h"
 #include "sanitizer_common/sanitizer_internal_defs.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
-#include <cstring>
 
 using namespace __sanitizer;
 
@@ -76,7 +75,7 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
   return begin <= y && (uptr)y < (uptr)begin + metadata->GetRequestedSize();
 }
 
-uint8_t GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
+u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
 u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 
@@ -107,18 +106,18 @@ inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
 u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
 
-inline uint8_t Metadata::GetRefCount() const { return state & ~(1 << 7); }
+inline u8 Metadata::GetRefCount() const { return state & ~(1 << 7); }
 
-inline void Metadata::SetRefCount(uint8_t val) {
+inline void Metadata::SetRefCount(u8 val) {
   atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), val,
                memory_order_relaxed);
 }
 
 inline void Metadata::IncRefCount() {
-  uint8_t s = state;
+  u8 s = state;
 
   do {
-    if (state == UINT8_MAX) {
+    if (state == PLSAN_REFCOUNT_MAX) {
       return;
     }
 
@@ -128,10 +127,10 @@ inline void Metadata::IncRefCount() {
 }
 
 inline void Metadata::DecRefCount() {
-  uint8_t s = state;
+  u8 s = state;
 
   do {
-    if (GetRefCount() == 0) {
+    if (GetRefCount() == PLSAN_REFCOUNT_MIN) {
       return;
     }
 
@@ -214,7 +213,7 @@ static void Deallocate(void *p) {
 
   CHECK(allocator.GetBlockBegin(p) == p);
   void **ptr = reinterpret_cast<void **>(p);
-  while ((uintptr_t)ptr < (uintptr_t)p + m->GetRequestedSize()) {
+  while ((uptr)ptr < (uptr)p + m->GetRequestedSize()) {
     DecRefCount(m);
     __plsan_check_memory_leak(*ptr);
     ptr++;

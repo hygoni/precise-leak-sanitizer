@@ -30,7 +30,7 @@ public:
   // Instrumentation function
 
   void reference_count(void **lhs, void *rhs);
-  __sanitizer::Vector<void *> *free_local_variable(void **arr_addr, size_t size,
+  __sanitizer::Vector<void *> *free_local_variable(void **arr_addr, uptr size,
                                                    void *ret_addr,
                                                    bool is_return);
   void check_returned_or_stored_value(void *ret_ptr_addr,
@@ -39,12 +39,9 @@ public:
   void check_memory_leak(RefCountAnalysis analysis_result);
   RefCountAnalysis leak_analysis(Metadata *metadata);
 
-  void *plsan_memset(void *ptr, int value, size_t num);
-  void *plsan_memcpy(void *dest, void *src, size_t count);
-  void *plsan_memmove(void *dest, void *src, size_t num);
-
-private:
-  void *ptr_array_value(void *array_start_addr, size_t index);
+  void *plsan_memset(void *ptr, int value, uptr num);
+  void *plsan_memcpy(void *dest, void *src, uptr count);
+  void *plsan_memmove(void *dest, void *src, uptr num);
 };
 
 extern bool plsan_inited;
@@ -60,7 +57,7 @@ bool PtrIsAllocatedFromPlsan(Metadata *metadata);
 bool IsSameObject(Metadata *metadata, const void *p, const void *q);
 void IncRefCount(Metadata *metadata);
 void DecRefCount(Metadata *metadata);
-uint8_t GetRefCount(Metadata *metadata);
+u8 GetRefCount(Metadata *metadata);
 u32 GetAllocTraceID(Metadata *metadata);
 
 void *plsan_malloc(uptr size, StackTrace *stack);

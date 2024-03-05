@@ -18,13 +18,11 @@ $ make -j$(nproc)
 
 ## Compile the program with -fsanitize=precise-leak
 
-Just as other sanitizers, passing -fsanitize=precise-leak option enables PreciseLeakSanitizer. PreciseLeakSanitizer automatically enables LeakSanitizer, but it is not intended to be ran with any other sanitizers other than LeakSanitizer.
-
-Use clang or clang++ depending on which language you use, but always add the link option -lstdc++. -llstdc++ is used by runtime library. These may be fixed in the future, but this is where we are now.
+Just as other sanitizers, passing -fsanitize=precise-leak option enables PreciseLeakSanitizer. PreciseLeakSanitizer automatically enables LeakSanitizer, but it is not intended to be ran with any other sanitizers other than LeakSanitizer. Use clang or clang++ depending on which language you use.
 
 
 ```bash
-$ ./build/bin/clang -fsanitize=precise-leak <source file> -lstdc++
+$ ./build/bin/clang -fsanitize=precise-leak <source file>
 ```
 
 # Before committing code to the repository
