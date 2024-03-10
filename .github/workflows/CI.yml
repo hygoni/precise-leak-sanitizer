@@ -42,3 +42,16 @@ jobs:
       - name: Run test-plsan.sh
         continue-on-error: true
         run: chmod +x ./scripts/test-plsan.sh | bash ./scripts/test-plsan.sh
+      - name: Clone benchmark
+        run: git clone https://github.com/hygoni/c-algorithms
+        continue-on-error: true
+      - name: Run benchmark
+        run: cd c-algorithms && bash ./measure.sh
+        continue-on-error: true
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Performance Data
+          path: c-algorithms/output
+          retention-days: 5
+        continue-on-error: true

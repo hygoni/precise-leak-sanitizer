@@ -161,6 +161,7 @@ else()
 endif()
 
 option(COMPILER_RT_DEBUG "Build runtimes with full debug info" OFF)
+option(COMPILER_RT_STACK_UNWIND "For stack trace unwinding" OFF)
 option(COMPILER_RT_EXTERNALIZE_DEBUGINFO
   "Generate dSYM files and strip executables and libraries (Darwin Only)" OFF)
 # COMPILER_RT_DEBUG_PYBOOL is used by lit.common.configured.in.
@@ -341,6 +342,8 @@ append_list_if(COMPILER_RT_HAS_FNO_EXCEPTIONS_FLAG -fno-exceptions SANITIZER_COM
 if(NOT COMPILER_RT_DEBUG AND NOT APPLE)
   append_list_if(COMPILER_RT_HAS_FOMIT_FRAME_POINTER_FLAG -fomit-frame-pointer SANITIZER_COMMON_CFLAGS)
 endif()
+append_list_if(COMPILER_RT_STACK_UNWIND -fno-omit-frame-pointer SANITIZER_COMMON_CFLAGS)
+append_list_if(COMPILER_RT_STACK_UNWIND -g SANITIZER_COMMON_CFLAGS)
 append_list_if(COMPILER_RT_HAS_FUNWIND_TABLES_FLAG -funwind-tables SANITIZER_COMMON_CFLAGS)
 append_list_if(COMPILER_RT_HAS_FNO_STACK_PROTECTOR_FLAG -fno-stack-protector SANITIZER_COMMON_CFLAGS)
 append_list_if(COMPILER_RT_HAS_FNO_SANITIZE_SAFE_STACK_FLAG -fno-sanitize=safe-stack SANITIZER_COMMON_CFLAGS)
