@@ -18,10 +18,6 @@
 #include "sanitizer_common/sanitizer_stacktrace.h"
 #include "sanitizer_common/sanitizer_symbolizer.h"
 
-__plsan::Plsan *plsan;
-
-namespace {
-
 struct LazyCheckInfo {
   __sanitizer::Vector<void *> *RefCountZeroAddrs;
 };
@@ -29,21 +25,9 @@ struct LazyCheckInfo {
 struct LazyCheckMetadataInfo {
   __sanitizer::Vector<__plsan::Metadata> *RefCountZeroMetadataList;
 };
-}
-
-/* Initialization routines called before main() */
-__attribute__((constructor)) void __plsan_init() {
-  void *mem = __sanitizer::InternalAlloc(sizeof(__plsan::Plsan));
-  plsan = new (mem) __plsan::Plsan();
-}
-
-/* finialization routines called after main() */
-__attribute__((destructor)) void __plsan_fini() {
-  __sanitizer::InternalFree(plsan);
-}
 
 extern "C" void __plsan_store(void **lhs, void *rhs) {
-  plsan->reference_count(lhs, rhs);
+  __plsan::reference_count(lhs, rhs);
 }
 
 extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
@@ -55,7 +39,7 @@ extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
     return nullptr;
 
   __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      plsan->free_local_variable(arr_start_addr, size, ret_addr, is_return);
+      __plsan::free_local_variable(arr_start_addr, size, ret_addr, is_return);
 
   // This return will be changed. It have to contain stack trace data.
   // __builtin_return_address(0) will return program counter
@@ -90,33 +74,29 @@ extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
 
 extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
                                                        void *compare_ptr_addr) {
-  plsan->check_returned_or_stored_value(ret_ptr_addr, compare_ptr_addr);
+  __plsan::check_returned_or_stored_value(ret_ptr_addr, compare_ptr_addr);
 }
 
 extern "C" void __plsan_check_memory_leak(void *addr) {
   __plsan::Metadata *metadata = __plsan::GetMetadata(addr);
-  plsan->check_memory_leak(metadata);
+  check_memory_leak(metadata);
 }
 
 extern "C" void *__plsan_memset(void *ptr, int value, uptr num) {
-  return plsan->plsan_memset(ptr, value, num);
+  return __plsan::plsan_memset(ptr, value, num);
 }
 
 extern "C" void *__plsan_memcpy(void *dest, void *src, uptr count) {
-  return plsan->plsan_memcpy(dest, src, count);
+  return __plsan::plsan_memcpy(dest, src, count);
 }
 
 extern "C" void *__plsan_memmove(void *dest, void *src, uptr num) {
-  return plsan->plsan_memmove(dest, src, num);
+  return __plsan::plsan_memmove(dest, src, num);
 }
 
 namespace __plsan {
 
-Plsan::Plsan() {}
-
-Plsan::~Plsan() {}
-
-void Plsan::reference_count(void **lhs, void *rhs) {
+void reference_count(void **lhs, void *rhs) {
   // Ref count with Shadow class update_shadow method.
   // When there is update in ref count, we should check there is any memory
   // leak. update_shadow method only decrease lhs's ref count, no problem with
@@ -131,9 +111,8 @@ void Plsan::reference_count(void **lhs, void *rhs) {
 
 // addr: address of the variable
 // size: size of a variable in bytes
-__sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr, uptr size,
-                                                        void *ret_addr,
-                                                        bool is_return) {
+__sanitizer::Vector<void *> *
+free_local_variable(void **addr, uptr size, void *ret_addr, bool is_return) {
   // free_local_variable() method is called just before return instruction
   // or some method that pops(restore) stack.
   // 1. If free_local_variable() is called just before return instruction,
@@ -175,8 +154,8 @@ __sanitizer::Vector<void *> *Plsan::free_local_variable(void **addr, uptr size,
   }
 }
 
-void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
-                                           void *compare_ptr_addr) {
+void check_returned_or_stored_value(void *ret_ptr_addr,
+                                    void *compare_ptr_addr) {
   // This method will be called after function call instruction and above store
   // and return instruction. If some function call return pointer type value, we
   // have to check if return pointer point dyn alloc memory and ref count is 0.
@@ -193,7 +172,7 @@ void Plsan::check_returned_or_stored_value(void *ret_ptr_addr,
   }
 }
 
-void Plsan::check_memory_leak(Metadata *metadata) {
+void check_memory_leak(Metadata *metadata) {
   RefCountAnalysis analysis_result = leak_analysis(metadata);
   // check exception type
   if (analysis_result.exceptTy == RefCountZero) {
@@ -201,25 +180,25 @@ void Plsan::check_memory_leak(Metadata *metadata) {
   }
 }
 
-void Plsan::check_memory_leak(RefCountAnalysis analysis_result) {
+void check_memory_leak(RefCountAnalysis analysis_result) {
   // check exception type
   if (analysis_result.exceptTy == RefCountZero) {
     __lsan::setLeakedLoc(analysis_result.stack_trace_id);
   }
 }
 
-void *Plsan::plsan_memset(void *ptr, int value, uptr num) {
+void *plsan_memset(void *ptr, int value, uptr num) {
   uptr *ptr_t = (uptr *)ptr;
   uptr *next_ptr = ptr_t;
   uptr *end_ptr = ptr_t + (num / 8);
   while (next_ptr < end_ptr) {
-    plsan->reference_count((void **)next_ptr, nullptr);
+    reference_count((void **)next_ptr, nullptr);
     next_ptr++;
   }
   return internal_memset(ptr, value, num);
 }
 
-void *Plsan::plsan_memcpy(void *dest, void *src, uptr count) {
+void *plsan_memcpy(void *dest, void *src, uptr count) {
   int i = 0;
   int j = 0;
   int end = count / sizeof(void *);
@@ -232,14 +211,14 @@ void *Plsan::plsan_memcpy(void *dest, void *src, uptr count) {
       j = 0;
       src_i = (void **)src_t;
     }
-    plsan->reference_count(dest_i, *src_i);
+    reference_count(dest_i, *src_i);
     i++;
     j++;
   }
   return internal_memcpy(dest, src, count);
 }
 
-void *Plsan::plsan_memmove(void *dest, void *src, uptr num) {
+void *plsan_memmove(void *dest, void *src, uptr num) {
   int i = 0;
   int end = num / sizeof(void *);
   uptr **dest_t = (uptr **)dest;
@@ -247,13 +226,13 @@ void *Plsan::plsan_memmove(void *dest, void *src, uptr num) {
   while (i < end) {
     void **dest_i = (void **)(dest_t + i);
     void **src_i = (void **)(src_t + i);
-    plsan->reference_count(dest_i, *src_i);
+    reference_count(dest_i, *src_i);
     i++;
   }
   return internal_memmove(dest, src, num);
 }
 
-RefCountAnalysis Plsan::leak_analysis(Metadata *metadata) {
+RefCountAnalysis leak_analysis(Metadata *metadata) {
   AddrType addr_type;
   ExceptionType exception_type;
   u32 stack_trace_id = 0;
@@ -361,7 +340,7 @@ __attribute__((constructor(0))) void __plsan_init() {
 
 void __plsan_check_memory_leak(void *addr) {
   Metadata *metadata = GetMetadata(addr);
-  plsan->check_memory_leak(metadata);
+  check_memory_leak(metadata);
 }
 
 } // namespace __plsan
