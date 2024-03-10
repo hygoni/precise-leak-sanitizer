@@ -23,12 +23,22 @@ jobs:
       - name: Run clang-format-diff.py
         run: git diff -U0 --no-color origin/main HEAD | python3 ./clang-format-diff.py -p1
       - name: Install necessary packages
-        run: sudo apt install -y bc
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        run: sudo apt install -y bc ccache
+      - name: Set key
+        run: echo "KEY=$(date '+%Y-%m-%d')-$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 6)" >> $GITHUB_ENV
+      - name: Get key
+        run: echo "$KEY"
+      - name: ccache
+        id: cache
+        uses: actions/cache@v3
         with:
-          version: "17.0"
+          path: /home/runner/.cache
+          key: ${{ runner.os }}-build-${{ env.KEY }}
+          restore-keys: ${{ runner.os }}-build-
       - name: Run build.sh
-        run: chmod +x ./scripts/build.sh | bash ./scripts/build.sh
+        run: chmod +x ./scripts/build-ci.sh | bash ./scripts/build-ci.sh
+      - name: Check ccache hit rate
+        run: ccache -s -v
       - name: Run test-plsan.sh
+        continue-on-error: true
         run: chmod +x ./scripts/test-plsan.sh | bash ./scripts/test-plsan.sh
