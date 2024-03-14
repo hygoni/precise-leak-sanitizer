@@ -13,6 +13,8 @@
 #include "sanitizer_common/sanitizer_stacktrace.h"
 namespace __plsan {
 
+static thread_local __sanitizer::Vector<void *> *local_var_ref_count_zero_list;
+
 enum AddrType { NonDynAlloc, DynAlloc };
 enum ExceptionType { None, RefCountZero };
 
@@ -65,6 +67,8 @@ void __plsan_init();
 void __plsan_check_memory_leak(void *addr);
 void InitializeInterceptors();
 void InstallAtExitCheckLeaks();
+void InitializeLocalVariableTLS();
+void DeleteLocalVariableTLS();
 
 } // namespace __plsan
 

@@ -306,6 +306,19 @@ static void InitializeFlags() {
   __sanitizer_set_report_path(common_flags()->log_path);
 }
 
+void InitializeLocalVariableTLS() {
+  __plsan::local_var_ref_count_zero_list =
+      (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
+          sizeof(__sanitizer::Vector<void *>));
+  CHECK(__plsan::local_var_ref_count_zero_list);
+  new (__plsan::local_var_ref_count_zero_list) __sanitizer::Vector<void *>();
+}
+
+void DeleteLocalVariableTLS() {
+  CHECK(__plsan::local_var_ref_count_zero_list);
+  __sanitizer::InternalFree(__plsan::local_var_ref_count_zero_list);
+}
+
 __attribute__((constructor(0))) void __plsan_init() {
   CHECK(!plsan_init_is_running);
   if (plsan_inited)
@@ -313,6 +326,7 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_init_is_running = true;
   SanitizerToolName = "PreciseLeakSanitizer";
 
+  InitializeLocalVariableTLS();
   CacheBinaryName();
   AvoidCVE_2016_2143();
   InitializeFlags();
@@ -342,6 +356,8 @@ void __plsan_check_memory_leak(void *addr) {
   Metadata *metadata = GetMetadata(addr);
   check_memory_leak(metadata);
 }
+
+__attribute__((destructor(0))) void __plsan_exit() { DeleteLocalVariableTLS(); }
 
 } // namespace __plsan
 
