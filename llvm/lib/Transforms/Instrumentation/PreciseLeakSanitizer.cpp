@@ -107,11 +107,8 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
       BuiltinAllocaStack.top();
 
   // Call __plsan_lazy_check
-  while (!LazyCheckInfoStack.empty()) {
-    Plsan.CreateCallWithMetaData(Builder, Plsan.LazyCheckFn,
-                                 {LazyCheckInfoStack.top(), ReturnValue});
-    LazyCheckInfoStack.pop();
-  }
+  if (isVLAExist)
+    Plsan.CreateCallWithMetaData(Builder, Plsan.LazyCheckFn, {ReturnValue});
 
   // Call __plsan_free_stack_array, non-variable length array
   for (VarAddrSizeInfo AddrAndSize : TopLocalVarList) {
@@ -237,10 +234,9 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
   for (VarAddrSizeInfo T : TopLocalVarList) {
     Value *ArrAddr = std::get<0>(T);
     Value *Size = std::get<1>(T);
-    CallInst *FreeLocalVariableFnCall = Plsan.CreateCallWithMetaData(
+    Plsan.CreateCallWithMetaData(
         Builder, Plsan.FreeLocalVariableFn,
         {ArrAddr, Size, NullPtr, FalseValue, TrueValue});
-    LazyCheckInfoStack.push(FreeLocalVariableFnCall);
   }
 
   for (VarAddrSizeInfoForBuiltinAlloca AddrAndSize : TopBuiltinAllocaList) {
@@ -248,11 +244,12 @@ void PreciseLeakSanVisitor::visitLLVMStackrestore(CallInst &I) {
     Value *Size = std::get<1>(AddrAndSize);
     Value *IsExecuted = std::get<2>(AddrAndSize);
     LoadInst *IsExecutedLoad = Builder.CreateLoad(Plsan.BoolTy, IsExecuted);
-    CallInst *FreeLocalVariableFnCall = Plsan.CreateCallWithMetaData(
+    Plsan.CreateCallWithMetaData(
         Builder, Plsan.FreeLocalVariableFn,
         {ArrAddr, Size, NullPtr, FalseValue, IsExecutedLoad});
-    LazyCheckInfoStack.push(FreeLocalVariableFnCall);
   }
+
+  isVLAExist = true;
 
   // Stack pointer restored, then pop local variable stack.
   LocalVarListStack.pop();
@@ -275,11 +272,11 @@ bool PreciseLeakSanitizer::initializeModule() {
   StoreFn = Mod.getOrInsertFunction(StoreFnName, StoreFnTy);
 
   FreeLocalVariableFnTy = FunctionType::get(
-      VoidPtrTy, {VoidPtrPtrTy, Int64Ty, VoidPtrTy, BoolTy, BoolTy}, false);
+      VoidTy, {VoidPtrPtrTy, Int64Ty, VoidPtrTy, BoolTy, BoolTy}, false);
   FreeLocalVariableFn =
       Mod.getOrInsertFunction(FreeLocalVariableFnName, FreeLocalVariableFnTy);
 
-  LazyCheckFnTy = FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy}, false);
+  LazyCheckFnTy = FunctionType::get(VoidTy, {VoidPtrTy, VoidPtrTy}, false);
   LazyCheckFn = Mod.getOrInsertFunction(LazyCheckFnName, LazyCheckFnTy);
 
   CheckReturnedOrStoredValueFnTy =
@@ -338,6 +335,8 @@ bool PreciseLeakSanitizer::run() {
       visitor.setCurrentFunctionEntryBlock(F.getEntryBlock());
 
     for (BasicBlock &BB : F) {
+      visitor.isVLAExist = false;
+
       for (Instruction &I : BB) {
         if (I.getMetadata(Plsan->PlsanMDName))
           continue;
