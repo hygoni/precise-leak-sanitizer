@@ -53,7 +53,7 @@ for test_case in $test_cases; do
 
   compile_options="-fsanitize=precise-leak"
   compile_options+=" -g -Wno-everything"
-  link_options="-lstdc++"
+  link_options=""
   # setting up compile options.
   if [ "$file_extension" == "cpp" ]; then
     compiler=build/bin/clang++
