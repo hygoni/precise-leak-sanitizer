@@ -28,7 +28,8 @@ set(PLSAN_LINK_LIBS
     ${SANITIZER_COMMON_LINK_LIBS}
     ${COMPILER_RT_CXX_LINK_LIBS})
 set(PLSAN_CFLAGS
-    ${SANITIZER_COMMON_CFLAGS})
+    ${SANITIZER_COMMON_CFLAGS}
+    -fno-omit-frame-pointer)
 append_rtti_flag(OFF PLSAN_CFLAGS)
 
 # Allow the PLSAN runtime to reference LLVM headers.
