@@ -372,6 +372,8 @@ bool PreciseLeakSanitizer::run() {
 CallInst *PreciseLeakSanitizer::CreateCallWithMetaData(IRBuilder<> &Builder,
                                                        FunctionCallee Fn,
                                                        ArrayRef<Value *> Args) {
+  // Print function name
+  errs() << Fn.getName() << "\n";
   CallInst *InstrumentedInst = Builder.CreateCall(Fn, Args);
   InstrumentedInst->setMetadata(PlsanMDName, PlsanMD);
   return InstrumentedInst;

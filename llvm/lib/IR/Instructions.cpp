@@ -648,10 +648,14 @@ void CallInst::init(FunctionType *FTy, Value *Func, ArrayRef<Value *> Args,
           (FTy->isVarArg() && Args.size() > FTy->getNumParams())) &&
          "Calling a function with bad signature!");
 
-  for (unsigned i = 0; i != Args.size(); ++i)
+  for (unsigned i = 0; i != Args.size(); ++i) {
+    // print the type of the argument and the type of the parameter
+    errs() << "Param type: " << *FTy->getParamType(i) << "\n";
+    errs() << "Arg type: " << *Args[i]->getType() << "\n";
     assert((i >= FTy->getNumParams() ||
             FTy->getParamType(i) == Args[i]->getType()) &&
            "Calling a function with a bad signature!");
+  }
 #endif
 
   // Set operands in order of their index to match use-list-order
