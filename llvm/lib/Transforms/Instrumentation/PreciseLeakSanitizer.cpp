@@ -207,6 +207,10 @@ void PreciseLeakSanVisitor::visitMemIntrinsics(MemIntrinsic &I) {
     Value *MemsetPtrArg = I.getArgOperand(0);
     Value *MemsetValueArg = I.getArgOperand(1);
     Value *MemsetNumArg = I.getArgOperand(2);
+    // cast to Int64Ty if MemsetNumArg is not Int64Ty
+    // because it might be Int32Ty if the function is i.e. memset.p0.i32
+    if (MemsetNumArg->getType() != Plsan.Int64Ty)
+      MemsetNumArg = Builder.CreateIntCast(MemsetNumArg, Plsan.Int64Ty, false);
     Plsan.CreateCallWithMetaData(Builder, Plsan.MemsetFn,
                                  {MemsetPtrArg, MemsetValueArg, MemsetNumArg});
   } else if (MemCpyInst *Inst = dyn_cast<MemCpyInst>(&I)) {
