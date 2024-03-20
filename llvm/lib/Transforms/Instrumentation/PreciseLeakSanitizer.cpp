@@ -265,7 +265,7 @@ bool PreciseLeakSanitizer::initializeModule() {
   PlsanMD = MDNode::get(Ctx, MDString::get(Ctx, "instrumented by plsan"));
 
   VoidTy = Type::getVoidTy(Ctx);
-  VoidPtrTy = PointerType::getUnqual(VoidTy);
+  VoidPtrTy = Type::getInt8PtrTy(Ctx);
   VoidPtrPtrTy = PointerType::getUnqual(VoidPtrTy);
   Int32Ty = Type::getInt32Ty(Ctx);
   Int64Ty = Type::getInt64Ty(Ctx);
