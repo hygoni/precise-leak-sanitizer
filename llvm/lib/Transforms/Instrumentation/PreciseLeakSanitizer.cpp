@@ -279,6 +279,7 @@ bool PreciseLeakSanitizer::initializeModule() {
   VoidTy = Type::getVoidTy(Ctx);
   VoidPtrTy = Type::getInt8PtrTy(Ctx);
   VoidPtrPtrTy = PointerType::getUnqual(VoidPtrTy);
+  Int8Ty = Type::getInt8Ty(Ctx);
   Int32Ty = Type::getInt32Ty(Ctx);
   Int64Ty = Type::getInt64Ty(Ctx);
   BoolTy = Type::getInt1Ty(Ctx);
@@ -304,7 +305,7 @@ bool PreciseLeakSanitizer::initializeModule() {
       Mod.getOrInsertFunction(CheckMemoryLeakFnName, CheckMemoryLeakFnTy);
 
   MemsetFnTy =
-      FunctionType::get(VoidPtrTy, {VoidPtrTy, Int32Ty, Int64Ty}, false);
+      FunctionType::get(VoidPtrTy, {VoidPtrTy, Int8Ty, Int64Ty}, false);
   MemsetFn = Mod.getOrInsertFunction(MemsetFnName, MemsetFnTy);
 
   MemcpyFnTy =

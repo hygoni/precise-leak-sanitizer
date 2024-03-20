@@ -37,6 +37,7 @@ private:
   Type *BoolTy;
   PointerType *VoidPtrTy;
   PointerType *VoidPtrPtrTy;
+  IntegerType *Int8Ty;
   IntegerType *Int32Ty;
   IntegerType *Int64Ty;
   FunctionType *AlignFnTy;
