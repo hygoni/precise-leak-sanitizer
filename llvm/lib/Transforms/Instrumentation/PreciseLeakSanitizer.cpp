@@ -165,6 +165,13 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
     IRBuilder<> Builder(LastInst);
     if (StoreInst *Inst = dyn_cast<StoreInst>(LastInst)) {
       Value *CompareAddr = Inst->getValueOperand();
+      if (CompareAddr->getType()->isPointerTy()) {
+        Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+                                    {RetAddr, CompareAddr});
+      } else {
+        Builder.SetInsertPoint(I.getNextNode());
+        Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
+      }
       Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
                                    {RetAddr, CompareAddr});
     } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
@@ -172,8 +179,13 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
       // if return value is void
       if (CompareAddr == NULL)
         CompareAddr = ConstantPointerNull::get(Plsan.VoidPtrTy);
-      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
-                                   {RetAddr, CompareAddr});
+      if (CompareAddr->getType()->isPointerTy()) {
+	      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+					   {RetAddr, CompareAddr});
+      } else {
+        Builder.SetInsertPoint(I.getNextNode());
+        Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
+      }
     } else {
       Builder.SetInsertPoint(I.getNextNode());
       Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
