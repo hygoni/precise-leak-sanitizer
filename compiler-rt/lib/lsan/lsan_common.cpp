@@ -995,6 +995,10 @@ void setLeakedLoc(u32 alloc_stack_trace_id) {
   BufferedStackTrace stack;
   stack.Unwind(StackTrace::GetCurrentPc(), GET_CURRENT_FRAME(), nullptr, true);
   u32 stack_trace_id = StackDepotPut(stack);
+  for (uptr j = 0; j != PreciseLeakedLoc[i].Size(); j++) {
+    if (PreciseLeakedLoc[i][j] == stack_trace_id)
+      return;
+  }
   PreciseLeakedLoc[i].PushBack(stack_trace_id);
 }
 
