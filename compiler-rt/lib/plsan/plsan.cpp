@@ -30,46 +30,28 @@ extern "C" void __plsan_store(void **lhs, void *rhs) {
   __plsan::reference_count(lhs, rhs);
 }
 
-extern "C" LazyCheckInfo *__plsan_free_local_variable(void **arr_start_addr,
-                                                      uptr size, void *ret_addr,
-                                                      bool is_return,
-                                                      bool is_allocated) {
+extern "C" void __plsan_free_local_variable(void **arr_start_addr, uptr size,
+                                            void *ret_addr, bool is_return,
+                                            bool is_allocated) {
 
   if (!is_allocated)
-    return nullptr;
+    return;
 
-  __sanitizer::Vector<void *> *ref_count_zero_addrs =
-      __plsan::free_local_variable(arr_start_addr, size, ret_addr, is_return);
-
-  // This return will be changed. It have to contain stack trace data.
-  // __builtin_return_address(0) will return program counter
-  LazyCheckInfo *lazy_check_info =
-      (LazyCheckInfo *)__sanitizer::InternalAlloc(sizeof(LazyCheckInfo));
-  CHECK(lazy_check_info);
-  lazy_check_info->RefCountZeroAddrs = ref_count_zero_addrs;
-  if (is_return) {
-    __sanitizer::InternalFree(lazy_check_info);
-    return nullptr;
-  } else {
-    return lazy_check_info;
-  }
+  __plsan::free_local_variable(arr_start_addr, size, ret_addr, is_return);
 }
 
-extern "C" void __plsan_lazy_check(LazyCheckInfo *lazy_check_info,
-                                   void *ret_addr) {
+extern "C" void __plsan_lazy_check(void *ret_addr) {
   __sanitizer::Vector<void *> *lazy_check_addr_list =
-      lazy_check_info->RefCountZeroAddrs;
+      __plsan::local_var_ref_count_zero_list;
 
-  for (int i = 0; i < lazy_check_addr_list->Size(); i++) {
+  for (int i = lazy_check_addr_list->Size() - 1; i >= 0; i--) {
     if ((*lazy_check_addr_list)[i] != ret_addr) {
       __plsan::Metadata *metadata =
           __plsan::GetMetadata((*lazy_check_addr_list)[i]);
       __lsan::setLeakedLoc(metadata->GetAllocTraceId());
+      lazy_check_addr_list->PopBack();
     }
   }
-
-  __sanitizer::InternalFree(lazy_check_addr_list);
-  __sanitizer::InternalFree(lazy_check_info);
 }
 
 extern "C" void __plsan_check_returned_or_stored_value(void *ret_ptr_addr,
@@ -111,8 +93,8 @@ void reference_count(void **lhs, void *rhs) {
 
 // addr: address of the variable
 // size: size of a variable in bytes
-__sanitizer::Vector<void *> *
-free_local_variable(void **addr, uptr size, void *ret_addr, bool is_return) {
+void free_local_variable(void **addr, uptr size, void *ret_addr,
+                         bool is_return) {
   // free_local_variable() method is called just before return instruction
   // or some method that pops(restore) stack.
   // 1. If free_local_variable() is called just before return instruction,
@@ -124,14 +106,6 @@ free_local_variable(void **addr, uptr size, void *ret_addr, bool is_return) {
   //    count. We do not check memory leak (lazy check). -> There is some cases
   //    that return restored stack value.
 
-  __sanitizer::Vector<void *> *ref_count_zero_addrs = nullptr;
-  if (is_return == false) {
-    void *mem = (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
-        sizeof(__sanitizer::Vector<void *>));
-    CHECK(mem);
-    ref_count_zero_addrs = new (mem) __sanitizer::Vector<void *>();
-  }
-
   void **pp = addr;
   while (pp + 1 <= addr + size / (sizeof(void *))) {
     void *ptr = *pp;
@@ -140,17 +114,11 @@ free_local_variable(void **addr, uptr size, void *ret_addr, bool is_return) {
     if (is_return == false) {
       RefCountAnalysis analysis_result = leak_analysis(metadata);
       if (analysis_result.exceptTy == RefCountZero)
-        ref_count_zero_addrs->PushBack(ptr);
+        local_var_ref_count_zero_list->PushBack(ptr);
     } else if (!IsSameObject(metadata, ptr, ret_addr)) {
       check_memory_leak(metadata);
     }
     pp++;
-  }
-
-  if (is_return == false) {
-    return ref_count_zero_addrs;
-  } else {
-    return nullptr;
   }
 }
 
@@ -306,6 +274,19 @@ static void InitializeFlags() {
   __sanitizer_set_report_path(common_flags()->log_path);
 }
 
+void InitializeLocalVariableTLS() {
+  __plsan::local_var_ref_count_zero_list =
+      (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
+          sizeof(__sanitizer::Vector<void *>));
+  CHECK(__plsan::local_var_ref_count_zero_list);
+  new (__plsan::local_var_ref_count_zero_list) __sanitizer::Vector<void *>();
+}
+
+void DeleteLocalVariableTLS() {
+  CHECK(__plsan::local_var_ref_count_zero_list);
+  __sanitizer::InternalFree(__plsan::local_var_ref_count_zero_list);
+}
+
 __attribute__((constructor(0))) void __plsan_init() {
   CHECK(!plsan_init_is_running);
   if (plsan_inited)
@@ -313,6 +294,7 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_init_is_running = true;
   SanitizerToolName = "PreciseLeakSanitizer";
 
+  InitializeLocalVariableTLS();
   CacheBinaryName();
   AvoidCVE_2016_2143();
   InitializeFlags();
@@ -342,6 +324,8 @@ void __plsan_check_memory_leak(void *addr) {
   Metadata *metadata = GetMetadata(addr);
   check_memory_leak(metadata);
 }
+
+__attribute__((destructor(0))) void __plsan_exit() { DeleteLocalVariableTLS(); }
 
 } // namespace __plsan
 

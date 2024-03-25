@@ -91,6 +91,8 @@ public:
   void setCurrentFunctionEntryBlock(BasicBlock &BB);
   std::vector<MemIntrinsic *> getIntrinToInstrument();
 
+  bool isVLAExist;
+
 private:
   PreciseLeakSanitizer &Plsan;
   std::stack<std::vector<VarAddrSizeInfo>> LocalVarListStack;

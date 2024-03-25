@@ -13,6 +13,8 @@
 #include "sanitizer_common/sanitizer_stacktrace.h"
 namespace __plsan {
 
+static thread_local __sanitizer::Vector<void *> *local_var_ref_count_zero_list;
+
 enum AddrType { NonDynAlloc, DynAlloc };
 enum ExceptionType { None, RefCountZero };
 
@@ -23,8 +25,8 @@ struct RefCountAnalysis {
 };
 
 void reference_count(void **lhs, void *rhs);
-__sanitizer::Vector<void *> *
-free_local_variable(void **arr_addr, uptr size, void *ret_addr, bool is_return);
+void free_local_variable(void **arr_addr, uptr size, void *ret_addr,
+                         bool is_return);
 void check_returned_or_stored_value(void *ret_ptr_addr, void *compare_ptr_addr);
 void check_memory_leak(Metadata *metadata);
 void check_memory_leak(RefCountAnalysis analysis_result);
@@ -65,6 +67,8 @@ void __plsan_init();
 void __plsan_check_memory_leak(void *addr);
 void InitializeInterceptors();
 void InstallAtExitCheckLeaks();
+void InitializeLocalVariableTLS();
+void DeleteLocalVariableTLS();
 
 } // namespace __plsan
 

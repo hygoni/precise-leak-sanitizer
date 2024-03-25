@@ -44,6 +44,7 @@ static void *ThreadStartFunc(void *arg) {
   SetSigProcMask(&reinterpret_cast<ThreadStartArg *>(arg)->starting_sigset_,
                  nullptr);
   InternalFree(arg);
+  InitializeLocalVariableTLS();
   auto self = GetThreadSelf();
   auto args = GetThreadArgRetval().GetArgs(self);
   void *retval = (*args.routine)(args.arg_retval);
@@ -98,6 +99,7 @@ INTERCEPTOR(int, pthread_detach, void *thread) {
 
 INTERCEPTOR(int, pthread_exit, void *retval) {
   GetThreadArgRetval().Finish(GetThreadSelf(), retval);
+  DeleteLocalVariableTLS();
   return REAL(pthread_exit)(retval);
 }
 
