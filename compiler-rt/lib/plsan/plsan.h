@@ -15,6 +15,8 @@ namespace __plsan {
 
 static thread_local __sanitizer::Vector<void *> *local_var_ref_count_zero_list;
 
+extern uptr *metadata_table;
+
 enum AddrType { NonDynAlloc, DynAlloc };
 enum ExceptionType { None, RefCountZero };
 
@@ -68,6 +70,7 @@ void __plsan_check_memory_leak(void *addr);
 void InitializeInterceptors();
 void InstallAtExitCheckLeaks();
 void InitializeLocalVariableTLS();
+void InitializeMetadataTable();
 void DeleteLocalVariableTLS();
 
 } // namespace __plsan

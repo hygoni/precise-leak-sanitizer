@@ -819,6 +819,7 @@ class SizeClassAllocator64 {
             GetMetadataEnd(region_beg) - region->mapped_meta - meta_map_size,
             meta_map_size, "SizeClassAllocator: region metadata")))
           return false;
+
         region->mapped_meta += meta_map_size;
       }
     }

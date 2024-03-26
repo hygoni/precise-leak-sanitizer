@@ -37,11 +37,7 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 }
 
 Metadata *GetMetadata(const void *p) {
-  p = allocator.GetBlockBegin(p);
-  if (!p)
-    return nullptr;
-
-  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
+  return __plsan_metadata_lookup(p);
 }
 
 void IncRefCount(Metadata *metadata) {
@@ -165,18 +161,24 @@ void PlsanAllocatorInit() {
 static void RegisterAllocation(const StackTrace *stack, void *p, uptr size) {
   if (!p)
     return;
-  Metadata *m = GetMetadata(p);
+
+  Metadata *m = reinterpret_cast<Metadata *>(allocator.GetMetaData(p));
   m->SetAllocated(StackDepotPut(*stack), size);
   m->SetLsanTag(__lsan::DisabledInThisThread() ? __lsan::kIgnored
                                                : __lsan::kDirectlyLeaked);
-
   RunMallocHooks(p, size);
+  if (!allocator.FromPrimary(p)) {
+    __plsan_set_metabase(reinterpret_cast<uptr>(p), reinterpret_cast<uptr>(m), size);
+  }
 }
 
 static void RegisterDeallocation(void *p) {
   if (!p)
     return;
   Metadata *m = GetMetadata(p);
+  if (!allocator.FromPrimary(p)) {
+    __plsan_reset_metabase(reinterpret_cast<uptr>(p), m->GetRequestedSize());
+  }
   RunFreeHooks(p);
   m->SetUnallocated();
 }
@@ -219,7 +221,6 @@ static void Deallocate(void *p) {
     ptr++;
   }
 
-  m->SetUnallocated();
   RegisterDeallocation(p);
   allocator.Deallocate(GetAllocatorCache(), p);
 }
@@ -257,6 +258,58 @@ static void *Reallocate(const StackTrace *stack, void *p, uptr new_size,
   }
 
   return new_p;
+}
+
+struct Metadata *__plsan_metadata_lookup(const void *p) {
+  if (allocator.FromPrimary(p)) {
+    // XXX: Is this necessary: p = allocator.GetBlockBegin(p)?
+    p = allocator.GetBlockBegin(p);
+    if (!p)
+      return nullptr;
+    return reinterpret_cast<Metadata *>(allocator.GetMetaData(p));
+  }
+
+  uptr addr = reinterpret_cast<uptr>(p);
+  uptr page_shift = __builtin_ctz(GetPageSizeCached());
+  uptr page_idx = addr >> page_shift;
+  uptr table_size = 1LL << (48 - page_shift);
+  if (page_idx >= table_size)
+    return nullptr;
+
+  uptr table_entry = *reinterpret_cast<uptr *>(metadata_table + page_idx);
+  // If no entry, it's not from the secondary allocator
+  if (!table_entry)
+    return nullptr;
+
+  return reinterpret_cast<Metadata *>(table_entry);
+}
+
+uptr *metadata_table;
+
+/*
+ * Metabase is stored in the metadata table when new page is allocated,
+ * not when an object is allocated or freed.
+ */
+void __plsan_set_metabase(uptr userbase, uptr metabase, uptr size) {
+  uptr page_size = GetPageSizeCached();
+  uptr page_shift = __builtin_ctz(page_size);
+  // Printf("[%s]: %llu\n", __func__, size);
+  // size should always be greater than or equal to page size
+  CHECK(size >= page_size);
+  uptr page_idx = userbase >> page_shift;
+  uptr end = (userbase + size) >> page_shift;
+  while (page_idx < end) {
+    metadata_table[page_idx++] = metabase;
+  }
+}
+
+void __plsan_reset_metabase(uptr userbase, uptr size) {
+  uptr page_shift = __builtin_ctz(GetPageSizeCached());
+  uptr page_idx = userbase >> page_shift;
+  uptr end = (userbase + size) >> page_shift;
+  while (page_idx < end) {
+    metadata_table[page_idx++] = 0;
+  }
 }
 
 void *plsan_malloc(uptr size, StackTrace *stack) {

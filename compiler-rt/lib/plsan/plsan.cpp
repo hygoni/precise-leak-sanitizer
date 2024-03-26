@@ -274,6 +274,16 @@ static void InitializeFlags() {
   __sanitizer_set_report_path(common_flags()->log_path);
 }
 
+void InitializeMetadataTable() {
+  // get page size
+  uptr page_size = GetPageSizeCached();
+
+  // assume 48 bits of virtual address space
+  uptr table_size = 1LL << (48 - __builtin_ctz(page_size));
+  metadata_table = (uptr *)MmapNoReserveOrDie(table_size * sizeof(void *),
+                                      "Metadata table");
+}
+
 void InitializeLocalVariableTLS() {
   __plsan::local_var_ref_count_zero_list =
       (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
@@ -294,6 +304,7 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_init_is_running = true;
   SanitizerToolName = "PreciseLeakSanitizer";
 
+  InitializeMetadataTable();
   InitializeLocalVariableTLS();
   CacheBinaryName();
   AvoidCVE_2016_2143();

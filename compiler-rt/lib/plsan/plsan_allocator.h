@@ -63,12 +63,19 @@ Metadata *GetMetadata(const void *p);
 
 static const uptr kMaxAllowedMallocSize = 1UL << 40;
 
+void __plsan_reset_metabase(uptr metabase, uptr size);
+void __plsan_set_metabase(uptr userbase, uptr metabase, uptr size);
+struct Metadata *__plsan_metadata_lookup(const void *p);
+
 // XXX: What should map/unmap callback do in PLSan?
 struct PlsanMapUnmapCallback {
   void OnMap(uptr p, uptr size) const {}
   void OnMapSecondary(uptr p, uptr size, uptr user_begin,
                       uptr user_size) const {}
   void OnUnmap(uptr p, uptr size) const {}
+  void OnMetaChunkInit(uptr user_chunk_base, uptr meta_chunk_base, uptr size) {
+    // __plsan_set_metabase(user_chunk_base, meta_chunk_base, size);
+  }
 };
 
 #if SANITIZER_APPLE
