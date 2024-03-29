@@ -221,6 +221,7 @@ static void Deallocate(void *p) {
 
   m->SetUnallocated();
   RegisterDeallocation(p);
+  allocator.Deallocate(GetAllocatorCache(), p);
 }
 
 static void *ReportAllocationSizeTooBig(uptr size, const StackTrace *stack) {
