@@ -10,6 +10,7 @@ set(PLSAN_SOURCES
     plsan_linux.cpp
     plsan_posix.cpp
     plsan_thread.cpp
+    plsan_metalloc.cpp
 )
 
 set(PLSAN_HEADERS
@@ -18,6 +19,7 @@ set(PLSAN_HEADERS
     plsan_linux.h
     plsan_posix.h
     plsan_thread.h
+    plsan_metalloc.h
 )
 
 set(PLSAN_LINK_FLAGS

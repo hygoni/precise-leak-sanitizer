@@ -14,6 +14,7 @@
 #include "plsan_allocator.h"
 #include "lsan/lsan_common.h"
 #include "plsan.h"
+#include "plsan_metalloc.h"
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_allocator_checks.h"
 #include "sanitizer_common/sanitizer_allocator_report.h"
@@ -37,11 +38,10 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 }
 
 Metadata *GetMetadata(const void *p) {
-  p = allocator.GetBlockBegin(p);
   if (!p)
     return nullptr;
 
-  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
+  return reinterpret_cast<struct Metadata *>(get_metadata((unsigned long)p));
 }
 
 void IncRefCount(Metadata *metadata) {
@@ -165,6 +165,7 @@ void PlsanAllocatorInit() {
 static void RegisterAllocation(const StackTrace *stack, void *p, uptr size) {
   if (!p)
     return;
+  set_metadata((unsigned long)p, size);
   Metadata *m = GetMetadata(p);
   m->SetAllocated(StackDepotPut(*stack), size);
   m->SetLsanTag(__lsan::DisabledInThisThread() ? __lsan::kIgnored

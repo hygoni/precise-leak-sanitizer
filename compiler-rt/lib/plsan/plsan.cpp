@@ -1,5 +1,6 @@
 #include "plsan.h"
 #include "plsan_allocator.h"
+#include "plsan_metalloc.h"
 #include "sanitizer_common/sanitizer_allocator_internal.h"
 #include "sanitizer_common/sanitizer_libc.h"
 
@@ -315,7 +316,7 @@ __attribute__((constructor(0))) void __plsan_init() {
   }
 
   VPrintf(1, "PreciseLeakSanitizer init done\n");
-
+  page_table_init();
   plsan_init_is_running = false;
   plsan_inited = true;
 }

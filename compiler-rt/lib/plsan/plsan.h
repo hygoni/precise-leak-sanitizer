@@ -9,6 +9,7 @@
 
 #include "plsan_allocator.h"
 #include "plsan_internal.h"
+#include "plsan_metalloc.h"
 #include "sanitizer_common/sanitizer_flags.h"
 #include "sanitizer_common/sanitizer_stacktrace.h"
 namespace __plsan {
