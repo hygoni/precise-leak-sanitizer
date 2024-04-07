@@ -116,6 +116,8 @@ struct AsanMapUnmapCallback {
   void OnMap(uptr p, uptr size) const;
   void OnMapSecondary(uptr p, uptr size, uptr user_begin, uptr user_size) const;
   void OnUnmap(uptr p, uptr size) const;
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {}
 };
 
 #if SANITIZER_CAN_USE_ALLOCATOR64

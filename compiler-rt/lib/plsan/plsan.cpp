@@ -280,8 +280,8 @@ void InitializeMetadataTable() {
 
   // assume 48 bits of virtual address space
   uptr table_size = 1LL << (48 - __builtin_ctz(page_size));
-  metadata_table = (uptr *)MmapNoReserveOrDie(table_size * sizeof(void *),
-                                      "Metadata table");
+  metadata_table =
+      (uptr *)MmapNoReserveOrDie(table_size * sizeof(void *), "Metadata table");
 }
 
 void InitializeLocalVariableTLS() {

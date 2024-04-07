@@ -44,6 +44,8 @@ struct MemprofMapUnmapCallback {
     OnMap(p, size);
   }
   void OnUnmap(uptr p, uptr size) const;
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {}
 };
 
 constexpr uptr kAllocatorSpace = 0x600000000000ULL;

@@ -67,6 +67,8 @@ struct NoOpMapUnmapCallback {
   void OnMapSecondary(uptr p, uptr size, uptr user_begin,
                       uptr user_size) const {}
   void OnUnmap(uptr p, uptr size) const {}
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {}
 };
 
 #include "sanitizer_allocator_size_class_map.h"

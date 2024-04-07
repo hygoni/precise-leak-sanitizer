@@ -50,6 +50,8 @@ struct MapUnmapCallback {
     uptr p_meta = (uptr)MemToMeta(p);
     ReleaseMemoryPagesToOS(p_meta, p_meta + size / kMetaRatio);
   }
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {}
 };
 
 static char allocator_placeholder[sizeof(Allocator)] ALIGNED(64);

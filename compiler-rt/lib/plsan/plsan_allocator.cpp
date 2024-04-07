@@ -36,9 +36,7 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(AllocatorCache);
 }
 
-Metadata *GetMetadata(const void *p) {
-  return __plsan_metadata_lookup(p);
-}
+Metadata *GetMetadata(const void *p) { return __plsan_metadata_lookup(p); }
 
 void IncRefCount(Metadata *metadata) {
   if (!metadata)
@@ -168,7 +166,8 @@ static void RegisterAllocation(const StackTrace *stack, void *p, uptr size) {
                                                : __lsan::kDirectlyLeaked);
   RunMallocHooks(p, size);
   if (!allocator.FromPrimary(p)) {
-    __plsan_set_metabase(reinterpret_cast<uptr>(p), reinterpret_cast<uptr>(m), size);
+    __plsan_set_metabase(reinterpret_cast<uptr>(p), reinterpret_cast<uptr>(m),
+                         size);
   }
 }
 
@@ -184,8 +183,16 @@ static void RegisterDeallocation(void *p) {
 }
 
 static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
-  if (UNLIKELY(size == 0))
-    size = 1;
+  // size should always be greater than or equal to 16
+  if (UNLIKELY(size < 16))
+    size = 16;
+  // and should be power of two for metadata lookup for primary allocator.
+  // XXX: this is a workaround - because SizeClassMap does not support
+  // power-of-two-only size classes.
+  const uptr kBitsPerByte = 8;
+  if ((size <= (1 << 15)) && ((size & (size - 1)) != 0))
+    size = 1LL << ((sizeof(unsigned int) * kBitsPerByte - __builtin_clz(size)));
+
   if (UNLIKELY(size > max_malloc_size)) {
     if (AllocatorMayReturnNull()) {
       Report("WARNING: PreciseLeakSanitizer failed to allocate 0x%zx bytes\n",
@@ -212,13 +219,18 @@ static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
 
 static void Deallocate(void *p) {
   Metadata *m = GetMetadata(p);
-
+  CHECK(m != nullptr);
+  uptr size = m->GetRequestedSize();
   CHECK(allocator.GetBlockBegin(p) == p);
-  void **ptr = reinterpret_cast<void **>(p);
-  while ((uptr)ptr < (uptr)p + m->GetRequestedSize()) {
-    DecRefCount(m);
-    __plsan_check_memory_leak(*ptr);
-    ptr++;
+
+  if (size >= sizeof(void *)) {
+    void **ptr = reinterpret_cast<void **>(p);
+    while ((uptr)ptr < (uptr)p + size) {
+      Metadata *n = GetMetadata(*ptr);
+      DecRefCount(n);
+      __plsan_check_memory_leak(*ptr);
+      ptr++;
+    }
   }
 
   RegisterDeallocation(p);
@@ -260,15 +272,12 @@ static void *Reallocate(const StackTrace *stack, void *p, uptr new_size,
   return new_p;
 }
 
-struct Metadata *__plsan_metadata_lookup(const void *p) {
-  if (allocator.FromPrimary(p)) {
-    // XXX: Is this necessary: p = allocator.GetBlockBegin(p)?
-    p = allocator.GetBlockBegin(p);
-    if (!p)
-      return nullptr;
-    return reinterpret_cast<Metadata *>(allocator.GetMetaData(p));
-  }
+// minimum size for mmap()
+const uptr kUserMapSize = 1 << 16;
+const uptr kMetaMapSize = 1 << 16;
+const uptr kMetadataSize = sizeof(struct Metadata);
 
+struct Metadata *__plsan_metadata_lookup(const void *p) {
   uptr addr = reinterpret_cast<uptr>(p);
   uptr page_shift = __builtin_ctz(GetPageSizeCached());
   uptr page_idx = addr >> page_shift;
@@ -276,12 +285,23 @@ struct Metadata *__plsan_metadata_lookup(const void *p) {
   if (page_idx >= table_size)
     return nullptr;
 
-  uptr table_entry = *reinterpret_cast<uptr *>(metadata_table + page_idx);
-  // If no entry, it's not from the secondary allocator
-  if (!table_entry)
+  uptr entry = *reinterpret_cast<uptr *>(metadata_table + page_idx);
+  // If there's no entry, it's not on heap
+  if (!entry)
     return nullptr;
 
-  return reinterpret_cast<Metadata *>(table_entry);
+  if (kAllocatorSpace <= addr && addr < kAllocatorEnd) {
+    uptr metabase = entry & ~(kUserMapSize - 1);
+    __sanitizer::u32 object_size = entry & (kUserMapSize - 1);
+    // XXX: integer division is costly
+    __sanitizer::u32 chunk_idx =
+        (addr % ((object_size / kMetadataSize) * kUserMapSize)) / object_size;
+    struct Metadata *m = reinterpret_cast<Metadata *>(
+        metabase - (1 + chunk_idx) * kMetadataSize);
+    return m;
+  }
+
+  return reinterpret_cast<Metadata *>(entry);
 }
 
 uptr *metadata_table;
@@ -293,13 +313,22 @@ uptr *metadata_table;
 void __plsan_set_metabase(uptr userbase, uptr metabase, uptr size) {
   uptr page_size = GetPageSizeCached();
   uptr page_shift = __builtin_ctz(page_size);
-  // Printf("[%s]: %llu\n", __func__, size);
-  // size should always be greater than or equal to page size
-  CHECK(size >= page_size);
   uptr page_idx = userbase >> page_shift;
   uptr end = (userbase + size) >> page_shift;
   while (page_idx < end) {
     metadata_table[page_idx++] = metabase;
+  }
+}
+
+void __plsan_set_metabase(uptr user_chunk_begin, uptr user_map_size,
+                          uptr meta_chunk_begin, uptr object_size) {
+  uptr page_size = GetPageSizeCached();
+  uptr page_shift = __builtin_ctz(page_size);
+  uptr page_idx = user_chunk_begin >> page_shift;
+  uptr end = (user_chunk_begin + user_map_size) >> page_shift;
+  while (page_idx < end) {
+    uptr entry = meta_chunk_begin | object_size;
+    metadata_table[page_idx++] = entry;
   }
 }
 

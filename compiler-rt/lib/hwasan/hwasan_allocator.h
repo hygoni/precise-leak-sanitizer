@@ -64,6 +64,8 @@ struct HwasanMapUnmapCallback {
     // Make it accessible with zero-tagged pointer.
     TagMemory(p, size, 0);
   }
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {}
 };
 
 static const uptr kMaxAllowedMallocSize = 1UL << 40;  // 1T
