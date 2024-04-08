@@ -9,8 +9,11 @@
 
 #define SYSTEM_PAGESIZE METALLOC_PAGESIZE
 
+// plsan's sizeof(metadata) is 8 bytes
 #define METADATASIZE 8
+
 #define METADATA_ALIGN 8
+
 //extern unsigned long pageTable[];
 #define pageTable ((unsigned long*)(0x400000000000))
 void page_table_init();
@@ -18,6 +21,7 @@ void* allocate_metadata(unsigned long size, unsigned long alignment);
 void deallocate_metadata(void *ptr, unsigned long size, unsigned long alignment);
 void set_metapagetable_entries(void *ptr, unsigned long size, void *metaptr, int alignment);
 unsigned long get_metapagetable_entry(void *ptr);
+void plsan_metadata_init();
 void set_metadata(unsigned long ptr, unsigned long size);
 void* get_metadata(unsigned long ptrInt);
 #endif

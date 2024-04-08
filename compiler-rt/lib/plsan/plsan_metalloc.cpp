@@ -1,8 +1,10 @@
-#include <sys/mman.h>             // for mmap, memadvise
-#include <string.h>               // for memchr
-#include <stdlib.h>               // for getenv
-#include <stdio.h>                // for printf
-#include <plsan_metalloc.h>
+#include "sys/mman.h"            // for mmap, memadvise
+#include "string.h"               // for memchr
+#include "stdlib.h"               // for getenv
+#include "stdio.h"                // for printf
+#include "sanitizer_common/sanitizer_common.h"
+
+#include "plsan_metalloc.h"
 
 #define unlikely(x)     __builtin_expect((x),0)
 
@@ -18,6 +20,8 @@
 // #define REFTABLESIZE ((unsigned long)((PAGETABLESIZE << sizeof(unsigned long)) / METALLOC_PAGESIZE) * PTPAGESPERREFENTRY)
 // Number of real pages covered by each reftable entry
 // #define REALPAGESPERREFENTRY ((unsigned long)(METALLOC_USEDSIZE >> sizeof(unsigned long)) * PTPAGESPERREFENTRY)
+
+using namespace __sanitizer;
 
 //unsigned long pageTable[PAGETABLESIZE];
 bool isPageTableAlloced = false;
@@ -96,13 +100,19 @@ unsigned long get_metapagetable_entry(void *ptr) {
     return pageTable[page];
 }
 
+void plsan_metadata_init() {
+    page_table_init();
+
+    // set_metadata();
+}
+
 void set_metadata(unsigned long ptr, unsigned long size) {
     unsigned long page_align_offset = METALLOC_PAGESIZE - 1;
     unsigned long page_align_mask = ~((unsigned long)METALLOC_PAGESIZE - 1);
     unsigned long aligned_start = ptr & page_align_mask;
     unsigned long aligned_size = ((size + ptr - aligned_start) + page_align_offset) & page_align_mask;
-    void* metadata = allocate_metadata(aligned_size, METADATA_ALIGN);
-    set_metapagetable_entries((void *)aligned_start, aligned_size, metadata, METADATA_ALIGN);
+    void *exec_metadata = allocate_metadata(aligned_size, METADATA_ALIGN);
+    set_metapagetable_entries((void*)aligned_start, aligned_size, exec_metadata, METADATA_ALIGN);
 }
 
 void* get_metadata(unsigned long ptrInt){

@@ -38,10 +38,13 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
 }
 
 Metadata *GetMetadata(const void *p) {
+  // we can calculate metadata address using only pointer value
+  // p = allocator.GetBlockBegin(p);
   if (!p)
     return nullptr;
-
-  return reinterpret_cast<struct Metadata *>(get_metadata((unsigned long)p));
+  
+  // return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
+  return reinterpret_cast<struct Metadata *>(get_metadata((uptr)p));
 }
 
 void IncRefCount(Metadata *metadata) {
@@ -165,7 +168,9 @@ void PlsanAllocatorInit() {
 static void RegisterAllocation(const StackTrace *stack, void *p, uptr size) {
   if (!p)
     return;
-  set_metadata((unsigned long)p, size);
+  // when pointer is allocated, we have to set about metadata
+  set_metadata((uptr)p, size);
+
   Metadata *m = GetMetadata(p);
   m->SetAllocated(StackDepotPut(*stack), size);
   m->SetLsanTag(__lsan::DisabledInThisThread() ? __lsan::kIgnored

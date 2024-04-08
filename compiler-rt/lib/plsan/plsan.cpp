@@ -310,13 +310,15 @@ __attribute__((constructor(0))) void __plsan_init() {
 
   InitializeCoverage(common_flags()->coverage, common_flags()->coverage_dir);
 
+  plsan_metadata_init();
+
   if (common_flags()->detect_leaks) {
     __lsan::ScopedInterceptorDisabler disabler;
     Symbolizer::LateInitialize();
   }
 
   VPrintf(1, "PreciseLeakSanitizer init done\n");
-  page_table_init();
+  
   plsan_init_is_running = false;
   plsan_inited = true;
 }
