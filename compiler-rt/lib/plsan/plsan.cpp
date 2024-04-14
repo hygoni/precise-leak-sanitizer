@@ -86,8 +86,11 @@ void reference_count(void **lhs, void *rhs) {
 
   Metadata *lhs_metadata = GetMetadata(*lhs);
   Metadata *rhs_metadata = GetMetadata(rhs);
+  if (!lhs_metadata && !rhs_metadata)
+    return;
 
-  UpdateReference(lhs_metadata, rhs_metadata);
+  DecRefCount(lhs_metadata);
+  IncRefCount(rhs_metadata);
   check_memory_leak(lhs_metadata);
 }
 
@@ -148,7 +151,13 @@ void *plsan_memset(void *ptr, int value, uptr num) {
   uptr *next_ptr = ptr_t;
   uptr *end_ptr = ptr_t + (num / 8);
   while (next_ptr < end_ptr) {
-    reference_count((void **)next_ptr, nullptr);
+    if (*(void **)next_ptr == nullptr) {
+      next_ptr++;
+      continue;
+    }
+    struct Metadata *metadata = GetMetadata(next_ptr);
+    if (metadata)
+      DecRefCount(metadata);
     next_ptr++;
   }
   return internal_memset(ptr, value, num);

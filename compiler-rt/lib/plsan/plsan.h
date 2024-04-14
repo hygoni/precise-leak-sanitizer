@@ -38,7 +38,6 @@ void LsanOnDeadlySignal(int signo, void *siginfo, void *context);
 void PlsanAllocatorInit();
 void PlsanAllocatorLock();
 void PlsanAllocatorUnlock();
-void UpdateReference(Metadata *lhs_metadata, Metadata *rhs_metadata);
 bool PtrIsAllocatedFromPlsan(Metadata *metadata);
 bool IsSameObject(Metadata *metadata, const void *p, const void *q);
 void IncRefCount(Metadata *metadata);
