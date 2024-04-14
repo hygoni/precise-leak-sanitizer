@@ -36,8 +36,6 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(AllocatorCache);
 }
 
-Metadata *GetMetadata(const void *p) { return __plsan_metadata_lookup(p); }
-
 void IncRefCount(Metadata *metadata) {
   if (!metadata)
     return;
@@ -283,40 +281,7 @@ static void *Reallocate(const StackTrace *stack, void *p, uptr new_size,
   return new_p;
 }
 
-// minimum size for mmap()
-const uptr kUserMapSize = 1 << 16;
-const uptr kMetaMapSize = 1 << 16;
-const uptr kMetadataSize = sizeof(struct Metadata);
-
-struct Metadata *__plsan_metadata_lookup(const void *p) {
-  uptr addr = reinterpret_cast<uptr>(p);
-  uptr page_shift = __builtin_ctz(GetPageSizeCached());
-  uptr page_idx = addr >> page_shift;
-  uptr table_size = 1LL << (48 - page_shift);
-  if (page_idx >= table_size)
-    return nullptr;
-
-  uptr entry = *reinterpret_cast<uptr *>(metadata_table + page_idx);
-  // If there's no entry, it's not on heap
-  if (!entry)
-    return nullptr;
-
-  if (kAllocatorSpace <= addr && addr < kAllocatorEnd) {
-    uptr metabase = entry & ~(kUserMapSize - 1);
-    __sanitizer::u32 object_size = entry & (kUserMapSize - 1);
-    // XXX: integer division is costly
-    __sanitizer::u32 chunk_idx =
-        (addr % ((object_size / kMetadataSize) * kUserMapSize)) / object_size;
-    struct Metadata *m = reinterpret_cast<Metadata *>(
-        metabase - (1 + chunk_idx) * kMetadataSize);
-    return m;
-  }
-
-  return reinterpret_cast<Metadata *>(entry);
-}
-
 uptr *metadata_table;
-
 /*
  * Metabase is stored in the metadata table when new page is allocated,
  * not when an object is allocated or freed.
