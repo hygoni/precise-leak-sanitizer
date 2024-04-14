@@ -20,15 +20,8 @@ extern uptr *metadata_table;
 enum AddrType { NonDynAlloc, DynAlloc };
 enum ExceptionType { None, RefCountZero };
 
-void reference_count(void **lhs, void *rhs);
-void free_local_variable(void **arr_addr, uptr size, void *ret_addr,
-                         bool is_return);
 void check_returned_or_stored_value(void *ret_ptr_addr, void *compare_ptr_addr);
 void check_memory_leak(Metadata *metadata);
-
-void *plsan_memset(void *ptr, int value, uptr num);
-void *plsan_memcpy(void *dest, void *src, uptr count);
-void *plsan_memmove(void *dest, void *src, uptr num);
 
 extern bool plsan_inited;
 extern bool plsan_init_is_running;

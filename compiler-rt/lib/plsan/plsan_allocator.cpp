@@ -82,11 +82,6 @@ u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
 u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 
-void UpdateReference(Metadata *lhs_metadata, Metadata *rhs_metadata) {
-  DecRefCount(lhs_metadata);
-  IncRefCount(rhs_metadata);
-}
-
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
   alloc_trace_id = stack;
