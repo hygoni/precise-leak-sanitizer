@@ -20,19 +20,11 @@ extern uptr *metadata_table;
 enum AddrType { NonDynAlloc, DynAlloc };
 enum ExceptionType { None, RefCountZero };
 
-struct RefCountAnalysis {
-  AddrType addrTy;
-  ExceptionType exceptTy;
-  u32 stack_trace_id;
-};
-
 void reference_count(void **lhs, void *rhs);
 void free_local_variable(void **arr_addr, uptr size, void *ret_addr,
                          bool is_return);
 void check_returned_or_stored_value(void *ret_ptr_addr, void *compare_ptr_addr);
 void check_memory_leak(Metadata *metadata);
-void check_memory_leak(RefCountAnalysis analysis_result);
-RefCountAnalysis leak_analysis(Metadata *metadata);
 
 void *plsan_memset(void *ptr, int value, uptr num);
 void *plsan_memcpy(void *dest, void *src, uptr count);

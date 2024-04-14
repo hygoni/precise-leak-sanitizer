@@ -112,8 +112,7 @@ void free_local_variable(void **addr, uptr size, void *ret_addr,
     Metadata *metadata = GetMetadata(ptr);
     DecRefCount(metadata);
     if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(metadata);
-      if (analysis_result.exceptTy == RefCountZero)
+      if (GetRefCount(metadata) == 0)
         local_var_ref_count_zero_list->PushBack(ptr);
     } else if (!IsSameObject(metadata, ptr, ret_addr)) {
       check_memory_leak(metadata);
@@ -130,28 +129,17 @@ void check_returned_or_stored_value(void *ret_ptr_addr,
   // For more information, see doumentation 4.3.1 When a function exits
 
   Metadata *metadata = GetMetadata(ret_ptr_addr);
-
-  RefCountAnalysis analysis_result = leak_analysis(metadata);
-  // check address type
-  if (analysis_result.addrTy == NonDynAlloc) {
+  if (!metadata)
     return;
-  } else if (!IsSameObject(metadata, ret_ptr_addr, compare_ptr_addr)) {
-    check_memory_leak(analysis_result);
+  // check address type
+  if (!IsSameObject(metadata, ret_ptr_addr, compare_ptr_addr)) {
+    check_memory_leak(metadata);
   }
 }
 
 void check_memory_leak(Metadata *metadata) {
-  RefCountAnalysis analysis_result = leak_analysis(metadata);
-  // check exception type
-  if (analysis_result.exceptTy == RefCountZero) {
-    __lsan::setLeakedLoc(analysis_result.stack_trace_id);
-  }
-}
-
-void check_memory_leak(RefCountAnalysis analysis_result) {
-  // check exception type
-  if (analysis_result.exceptTy == RefCountZero) {
-    __lsan::setLeakedLoc(analysis_result.stack_trace_id);
+  if (metadata && GetRefCount(metadata) == 0) {
+    __lsan::setLeakedLoc(metadata->GetAllocTraceId());
   }
 }
 
@@ -198,28 +186,6 @@ void *plsan_memmove(void *dest, void *src, uptr num) {
     i++;
   }
   return internal_memmove(dest, src, num);
-}
-
-RefCountAnalysis leak_analysis(Metadata *metadata) {
-  AddrType addr_type;
-  ExceptionType exception_type;
-  u32 stack_trace_id = 0;
-  // If address is dynamic allocated memory
-  if (metadata) {
-    addr_type = DynAlloc;
-    if (GetRefCount(metadata) == 0) {
-      exception_type = RefCountZero;
-      stack_trace_id = GetAllocTraceID(metadata);
-    } else {
-      exception_type = None;
-    }
-  } else {
-    addr_type = NonDynAlloc;
-    exception_type = None;
-  }
-
-  RefCountAnalysis result = {addr_type, exception_type, stack_trace_id};
-  return result;
 }
 
 void PlsanInstallAtForkHandler() {
