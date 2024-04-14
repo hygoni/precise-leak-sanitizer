@@ -62,12 +62,12 @@ const uptr kUserMapSize = 1 << 16;
 const uptr kMetaMapSize = 1 << 16;
 const uptr kMetadataSize = sizeof(struct Metadata);
 extern uptr *metadata_table;
+const uptr page_shift = 12;
+const uptr table_size = 1LL << (48 - page_shift);
 
 inline struct Metadata *GetMetadata(const void *p) {
   uptr addr = reinterpret_cast<uptr>(p);
-  uptr page_shift = __builtin_ctz(GetPageSizeCached());
   uptr page_idx = addr >> page_shift;
-  uptr table_size = 1LL << (48 - page_shift);
   if (page_idx >= table_size)
     return nullptr;
 
