@@ -772,6 +772,8 @@ class SizeClassAllocator64 {
     // region->mutex is held.
     const uptr region_beg = GetRegionBeginBySizeClass(class_id);
     const uptr size = ClassIdToSize(class_id);
+    uptr user_map_size = 0;
+    uptr user_chunk_begin = 0;
 
     const uptr total_user_bytes =
         region->allocated_user + requested_count * size;
@@ -791,7 +793,7 @@ class SizeClassAllocator64 {
           region->rtoi.last_release_at_ns = MonotonicNanoTime();
       }
       // Do the mmap for the user memory.
-      const uptr user_map_size =
+      user_map_size =
           RoundUpTo(total_user_bytes - region->mapped_user, kUserMapSize);
       if (UNLIKELY(IsRegionExhausted(region, class_id, user_map_size)))
         return false;
@@ -799,6 +801,15 @@ class SizeClassAllocator64 {
                                     user_map_size,
                                     "SizeClassAllocator: region data")))
         return false;
+      user_chunk_begin = region_beg + region->mapped_user;
+      uptr first_chunk_idx = GetChunkIdx(user_chunk_begin, size);
+      // Round down to chunksPerMap
+      const uptr chunksPerMap = kMetaMapSize / kMetadataSize;
+      first_chunk_idx = (first_chunk_idx / chunksPerMap) * chunksPerMap;
+      const uptr meta_chunk_begin =
+          GetMetadataEnd(region_beg) - (first_chunk_idx)*kMetadataSize;
+      MapUnmapCallback().OnMetaChunkInit(user_chunk_begin, user_map_size,
+                                         meta_chunk_begin, size);
       stat->Add(AllocatorStatMapped, user_map_size);
       region->mapped_user += user_map_size;
     }

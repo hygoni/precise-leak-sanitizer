@@ -63,27 +63,44 @@ Metadata *GetMetadata(const void *p);
 
 static const uptr kMaxAllowedMallocSize = 1UL << 40;
 
+void __plsan_reset_metabase(uptr metabase, uptr size);
+void __plsan_set_metabase(uptr userbase, uptr metabase, uptr size);
+void __plsan_set_metabase(uptr user_chunk_begin, uptr user_map_size,
+                          uptr meta_chunk_begin, uptr object_size);
+struct Metadata *__plsan_metadata_lookup(const void *p);
+
 // XXX: What should map/unmap callback do in PLSan?
 struct PlsanMapUnmapCallback {
   void OnMap(uptr p, uptr size) const {}
   void OnMapSecondary(uptr p, uptr size, uptr user_begin,
                       uptr user_size) const {}
   void OnUnmap(uptr p, uptr size) const {}
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {
+    __plsan_set_metabase(user_chunk_base, user_map_size, meta_chunk_base,
+                         object_size);
+  }
 };
 
 #if SANITIZER_APPLE
 const uptr kAllocatorSpace = 0x600000000000ULL;
-const uptr kAllocatorSize  = 0x40000000000ULL;  // 4T.
+// const uptr kAllocatorSize  = 0x40000000000ULL;  // 4T.
+const uptr kAllocatorSize = 0x2000000000ULL; // 128G.
 #else
 const uptr kAllocatorSpace = 0x500000000000ULL;
-const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
+// const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
+const uptr kAllocatorSize = 0x2000000000ULL; // 128G.
 #endif
 const uptr kAllocatorEnd = kAllocatorSpace + kAllocatorSize;
 
 struct AP64 {
   static const uptr kSpaceBeg = kAllocatorSpace;
   static const uptr kSpaceSize = kAllocatorSize; // 4T.
-  typedef __sanitizer::DefaultSizeClassMap SizeClassMap;
+  // VeryCompactSizeClassMap restricts the primary allocator's
+  // max allocation size under 2^15, which metadata table depends on.
+  // This is kind of workaround to make max allocation to be equal to
+  // kMetaMapSize and kUserMapSize
+  typedef __sanitizer::SizeClassMap<2, 5, 9, 15, 64, 14> SizeClassMap;
   static const uptr kMetadataSize = sizeof(Metadata);
   using AddressSpaceView = LocalAddressSpaceView;
   static const uptr kFlags = 0;

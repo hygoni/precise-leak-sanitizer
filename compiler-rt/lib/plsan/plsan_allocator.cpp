@@ -36,14 +36,6 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(AllocatorCache);
 }
 
-Metadata *GetMetadata(const void *p) {
-  p = allocator.GetBlockBegin(p);
-  if (!p)
-    return nullptr;
-
-  return reinterpret_cast<struct Metadata *>(allocator.GetMetaData(p));
-}
-
 void IncRefCount(Metadata *metadata) {
   if (!metadata)
     return;
@@ -65,8 +57,19 @@ bool PtrIsAllocatedFromPlsan(Metadata *metadata) {
 }
 
 bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
-  if (!x || !y || !metadata)
+  if (!metadata || !y)
     return false;
+
+  if (x == y)
+    return true;
+
+  uptr size = metadata->GetRequestedSize();
+  if (size <= (1 << 15)) {
+    // size is always power of two if allocated from the primary
+    uptr a = reinterpret_cast<uptr>(x) & ~(size - 1);
+    uptr b = reinterpret_cast<uptr>(y) & ~(size - 1);
+    return a == b;
+  }
 
   void *begin = allocator.GetBlockBegin(x);
   if (!begin)
@@ -78,11 +81,6 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
 u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
 u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
-
-void UpdateReference(Metadata *lhs_metadata, Metadata *rhs_metadata) {
-  DecRefCount(lhs_metadata);
-  IncRefCount(rhs_metadata);
-}
 
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
@@ -165,25 +163,40 @@ void PlsanAllocatorInit() {
 static void RegisterAllocation(const StackTrace *stack, void *p, uptr size) {
   if (!p)
     return;
-  Metadata *m = GetMetadata(p);
+
+  Metadata *m = reinterpret_cast<Metadata *>(allocator.GetMetaData(p));
   m->SetAllocated(StackDepotPut(*stack), size);
   m->SetLsanTag(__lsan::DisabledInThisThread() ? __lsan::kIgnored
                                                : __lsan::kDirectlyLeaked);
-
   RunMallocHooks(p, size);
+  if (!allocator.FromPrimary(p)) {
+    __plsan_set_metabase(reinterpret_cast<uptr>(p), reinterpret_cast<uptr>(m),
+                         size);
+  }
 }
 
 static void RegisterDeallocation(void *p) {
   if (!p)
     return;
   Metadata *m = GetMetadata(p);
+  if (!allocator.FromPrimary(p)) {
+    __plsan_reset_metabase(reinterpret_cast<uptr>(p), m->GetRequestedSize());
+  }
   RunFreeHooks(p);
   m->SetUnallocated();
 }
 
 static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
-  if (UNLIKELY(size == 0))
-    size = 1;
+  // size should always be greater than or equal to 16
+  if (UNLIKELY(size < 16))
+    size = 16;
+  // and should be power of two for metadata lookup for primary allocator.
+  // XXX: this is a workaround - because SizeClassMap does not support
+  // power-of-two-only size classes.
+  const uptr kBitsPerByte = 8;
+  if ((size <= (1 << 15)) && ((size & (size - 1)) != 0))
+    size = 1LL << ((sizeof(unsigned int) * kBitsPerByte - __builtin_clz(size)));
+
   if (UNLIKELY(size > max_malloc_size)) {
     if (AllocatorMayReturnNull()) {
       Report("WARNING: PreciseLeakSanitizer failed to allocate 0x%zx bytes\n",
@@ -210,16 +223,20 @@ static void *Allocate(StackTrace *stack, uptr size, uptr alignment) {
 
 static void Deallocate(void *p) {
   Metadata *m = GetMetadata(p);
-
+  CHECK(m != nullptr);
+  uptr size = m->GetRequestedSize();
   CHECK(allocator.GetBlockBegin(p) == p);
-  void **ptr = reinterpret_cast<void **>(p);
-  while ((uptr)ptr < (uptr)p + m->GetRequestedSize()) {
-    DecRefCount(m);
-    __plsan_check_memory_leak(*ptr);
-    ptr++;
+
+  if (size >= sizeof(void *)) {
+    void **ptr = reinterpret_cast<void **>(p);
+    while ((uptr)ptr < (uptr)p + size) {
+      Metadata *n = GetMetadata(*ptr);
+      DecRefCount(n);
+      __plsan_check_memory_leak(*ptr);
+      ptr++;
+    }
   }
 
-  m->SetUnallocated();
   RegisterDeallocation(p);
   allocator.Deallocate(GetAllocatorCache(), p);
 }
@@ -257,6 +274,42 @@ static void *Reallocate(const StackTrace *stack, void *p, uptr new_size,
   }
 
   return new_p;
+}
+
+uptr *metadata_table;
+/*
+ * Metabase is stored in the metadata table when new page is allocated,
+ * not when an object is allocated or freed.
+ */
+void __plsan_set_metabase(uptr userbase, uptr metabase, uptr size) {
+  uptr page_size = GetPageSizeCached();
+  uptr page_shift = __builtin_ctz(page_size);
+  uptr page_idx = userbase >> page_shift;
+  uptr end = (userbase + size) >> page_shift;
+  while (page_idx < end) {
+    metadata_table[page_idx++] = metabase;
+  }
+}
+
+void __plsan_set_metabase(uptr user_chunk_begin, uptr user_map_size,
+                          uptr meta_chunk_begin, uptr object_size) {
+  uptr page_size = GetPageSizeCached();
+  uptr page_shift = __builtin_ctz(page_size);
+  uptr page_idx = user_chunk_begin >> page_shift;
+  uptr end = (user_chunk_begin + user_map_size) >> page_shift;
+  while (page_idx < end) {
+    uptr entry = meta_chunk_begin | object_size;
+    metadata_table[page_idx++] = entry;
+  }
+}
+
+void __plsan_reset_metabase(uptr userbase, uptr size) {
+  uptr page_shift = __builtin_ctz(GetPageSizeCached());
+  uptr page_idx = userbase >> page_shift;
+  uptr end = (userbase + size) >> page_shift;
+  while (page_idx < end) {
+    metadata_table[page_idx++] = 0;
+  }
 }
 
 void *plsan_malloc(uptr size, StackTrace *stack) {

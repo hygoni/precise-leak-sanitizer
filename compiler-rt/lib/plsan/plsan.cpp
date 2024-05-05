@@ -27,17 +27,52 @@ struct LazyCheckMetadataInfo {
 };
 
 extern "C" void __plsan_store(void **lhs, void *rhs) {
-  __plsan::reference_count(lhs, rhs);
+  // Ref count with Shadow class update_shadow method.
+  // When there is update in ref count, we should check there is any memory
+  // leak. update_shadow method only decrease lhs's ref count, no problem with
+  // checking only lhs.
+
+  __plsan::Metadata *lhs_metadata = __plsan::GetMetadata(*lhs);
+  __plsan::Metadata *rhs_metadata = __plsan::GetMetadata(rhs);
+  if (!lhs_metadata && !rhs_metadata)
+    return;
+
+  __plsan::DecRefCount(lhs_metadata);
+  __plsan::IncRefCount(rhs_metadata);
+  __plsan::check_memory_leak(lhs_metadata);
 }
 
-extern "C" void __plsan_free_local_variable(void **arr_start_addr, uptr size,
+extern "C" void __plsan_free_local_variable(void **addr, uptr size,
                                             void *ret_addr, bool is_return,
                                             bool is_allocated) {
 
   if (!is_allocated)
     return;
 
-  __plsan::free_local_variable(arr_start_addr, size, ret_addr, is_return);
+  // free_local_variable() method is called just before return instruction
+  // or some method that pops(restore) stack.
+  // 1. If free_local_variable() is called just before return instruction,
+  //    then "is_return" arg is true and decrease local variables' ref count.
+  //    We have to check memory leak in this case. If stack address is same with
+  //    ret_addr, then it is not a memory leak. (See Documentation 4.3.1)
+  // 2. If free_local_variable() is called just before some method that restore
+  //    stack, then "is_return" arg is false and decrease stack variables ref
+  //    count. We do not check memory leak (lazy check). -> There is some cases
+  //    that return restored stack value.
+
+  void **pp = addr;
+  while (pp + 1 <= addr + size / (sizeof(void *))) {
+    void *ptr = *pp;
+    __plsan::Metadata *metadata = __plsan::GetMetadata(ptr);
+    __plsan::DecRefCount(metadata);
+    if (is_return == false) {
+      if (__plsan::GetRefCount(metadata) == 0)
+        __plsan::local_var_ref_count_zero_list->PushBack(ptr);
+    } else if (!__plsan::IsSameObject(metadata, ptr, ret_addr)) {
+      __plsan::check_memory_leak(metadata);
+    }
+    pp++;
+  }
 }
 
 extern "C" void __plsan_lazy_check(void *ret_addr) {
@@ -65,108 +100,23 @@ extern "C" void __plsan_check_memory_leak(void *addr) {
 }
 
 extern "C" void *__plsan_memset(void *ptr, int value, uptr num) {
-  return __plsan::plsan_memset(ptr, value, num);
-}
-
-extern "C" void *__plsan_memcpy(void *dest, void *src, uptr count) {
-  return __plsan::plsan_memcpy(dest, src, count);
-}
-
-extern "C" void *__plsan_memmove(void *dest, void *src, uptr num) {
-  return __plsan::plsan_memmove(dest, src, num);
-}
-
-namespace __plsan {
-
-void reference_count(void **lhs, void *rhs) {
-  // Ref count with Shadow class update_shadow method.
-  // When there is update in ref count, we should check there is any memory
-  // leak. update_shadow method only decrease lhs's ref count, no problem with
-  // checking only lhs.
-
-  Metadata *lhs_metadata = GetMetadata(*lhs);
-  Metadata *rhs_metadata = GetMetadata(rhs);
-
-  UpdateReference(lhs_metadata, rhs_metadata);
-  check_memory_leak(lhs_metadata);
-}
-
-// addr: address of the variable
-// size: size of a variable in bytes
-void free_local_variable(void **addr, uptr size, void *ret_addr,
-                         bool is_return) {
-  // free_local_variable() method is called just before return instruction
-  // or some method that pops(restore) stack.
-  // 1. If free_local_variable() is called just before return instruction,
-  //    then "is_return" arg is true and decrease local variables' ref count.
-  //    We have to check memory leak in this case. If stack address is same with
-  //    ret_addr, then it is not a memory leak. (See Documentation 4.3.1)
-  // 2. If free_local_variable() is called just before some method that restore
-  //    stack, then "is_return" arg is false and decrease stack variables ref
-  //    count. We do not check memory leak (lazy check). -> There is some cases
-  //    that return restored stack value.
-
-  void **pp = addr;
-  while (pp + 1 <= addr + size / (sizeof(void *))) {
-    void *ptr = *pp;
-    Metadata *metadata = GetMetadata(ptr);
-    DecRefCount(metadata);
-    if (is_return == false) {
-      RefCountAnalysis analysis_result = leak_analysis(metadata);
-      if (analysis_result.exceptTy == RefCountZero)
-        local_var_ref_count_zero_list->PushBack(ptr);
-    } else if (!IsSameObject(metadata, ptr, ret_addr)) {
-      check_memory_leak(metadata);
-    }
-    pp++;
-  }
-}
-
-void check_returned_or_stored_value(void *ret_ptr_addr,
-                                    void *compare_ptr_addr) {
-  // This method will be called after function call instruction and above store
-  // and return instruction. If some function call return pointer type value, we
-  // have to check if return pointer point dyn alloc memory and ref count is 0.
-  // For more information, see doumentation 4.3.1 When a function exits
-
-  Metadata *metadata = GetMetadata(ret_ptr_addr);
-
-  RefCountAnalysis analysis_result = leak_analysis(metadata);
-  // check address type
-  if (analysis_result.addrTy == NonDynAlloc) {
-    return;
-  } else if (!IsSameObject(metadata, ret_ptr_addr, compare_ptr_addr)) {
-    check_memory_leak(analysis_result);
-  }
-}
-
-void check_memory_leak(Metadata *metadata) {
-  RefCountAnalysis analysis_result = leak_analysis(metadata);
-  // check exception type
-  if (analysis_result.exceptTy == RefCountZero) {
-    __lsan::setLeakedLoc(analysis_result.stack_trace_id);
-  }
-}
-
-void check_memory_leak(RefCountAnalysis analysis_result) {
-  // check exception type
-  if (analysis_result.exceptTy == RefCountZero) {
-    __lsan::setLeakedLoc(analysis_result.stack_trace_id);
-  }
-}
-
-void *plsan_memset(void *ptr, int value, uptr num) {
   uptr *ptr_t = (uptr *)ptr;
   uptr *next_ptr = ptr_t;
   uptr *end_ptr = ptr_t + (num / 8);
   while (next_ptr < end_ptr) {
-    reference_count((void **)next_ptr, nullptr);
+    if (*(void **)next_ptr == nullptr) {
+      next_ptr++;
+      continue;
+    }
+    __plsan::Metadata *metadata = __plsan::GetMetadata(next_ptr);
+    if (metadata)
+      __plsan::DecRefCount(metadata);
     next_ptr++;
   }
-  return internal_memset(ptr, value, num);
+  return __sanitizer::internal_memset(ptr, value, num);
 }
 
-void *plsan_memcpy(void *dest, void *src, uptr count) {
+extern "C" void *__plsan_memcpy(void *dest, void *src, uptr count) {
   int i = 0;
   int j = 0;
   int end = count / sizeof(void *);
@@ -179,14 +129,14 @@ void *plsan_memcpy(void *dest, void *src, uptr count) {
       j = 0;
       src_i = (void **)src_t;
     }
-    reference_count(dest_i, *src_i);
+    __plsan_store(dest_i, *src_i);
     i++;
     j++;
   }
-  return internal_memcpy(dest, src, count);
+  return __sanitizer::internal_memcpy(dest, src, count);
 }
 
-void *plsan_memmove(void *dest, void *src, uptr num) {
+extern "C" void *__plsan_memmove(void *dest, void *src, uptr num) {
   int i = 0;
   int end = num / sizeof(void *);
   uptr **dest_t = (uptr **)dest;
@@ -194,32 +144,34 @@ void *plsan_memmove(void *dest, void *src, uptr num) {
   while (i < end) {
     void **dest_i = (void **)(dest_t + i);
     void **src_i = (void **)(src_t + i);
-    reference_count(dest_i, *src_i);
+    __plsan_store(dest_i, *src_i);
     i++;
   }
-  return internal_memmove(dest, src, num);
+  return __sanitizer::internal_memmove(dest, src, num);
 }
 
-RefCountAnalysis leak_analysis(Metadata *metadata) {
-  AddrType addr_type;
-  ExceptionType exception_type;
-  u32 stack_trace_id = 0;
-  // If address is dynamic allocated memory
-  if (metadata) {
-    addr_type = DynAlloc;
-    if (GetRefCount(metadata) == 0) {
-      exception_type = RefCountZero;
-      stack_trace_id = GetAllocTraceID(metadata);
-    } else {
-      exception_type = None;
-    }
-  } else {
-    addr_type = NonDynAlloc;
-    exception_type = None;
-  }
+namespace __plsan {
 
-  RefCountAnalysis result = {addr_type, exception_type, stack_trace_id};
-  return result;
+void check_returned_or_stored_value(void *ret_ptr_addr,
+                                    void *compare_ptr_addr) {
+  // This method will be called after function call instruction and above store
+  // and return instruction. If some function call return pointer type value, we
+  // have to check if return pointer point dyn alloc memory and ref count is 0.
+  // For more information, see doumentation 4.3.1 When a function exits
+
+  Metadata *metadata = GetMetadata(ret_ptr_addr);
+  if (!metadata)
+    return;
+  // check address type
+  if (!IsSameObject(metadata, ret_ptr_addr, compare_ptr_addr)) {
+    check_memory_leak(metadata);
+  }
+}
+
+void check_memory_leak(Metadata *metadata) {
+  if (metadata && GetRefCount(metadata) == 0) {
+    __lsan::setLeakedLoc(metadata->GetAllocTraceId());
+  }
 }
 
 void PlsanInstallAtForkHandler() {
@@ -274,6 +226,16 @@ static void InitializeFlags() {
   __sanitizer_set_report_path(common_flags()->log_path);
 }
 
+void InitializeMetadataTable() {
+  // get page size
+  uptr page_size = GetPageSizeCached();
+
+  // assume 48 bits of virtual address space
+  uptr table_size = 1LL << (48 - __builtin_ctz(page_size));
+  metadata_table =
+      (uptr *)MmapNoReserveOrDie(table_size * sizeof(void *), "Metadata table");
+}
+
 void InitializeLocalVariableTLS() {
   __plsan::local_var_ref_count_zero_list =
       (__sanitizer::Vector<void *> *)__sanitizer::InternalAlloc(
@@ -294,6 +256,7 @@ __attribute__((constructor(0))) void __plsan_init() {
   plsan_init_is_running = true;
   SanitizerToolName = "PreciseLeakSanitizer";
 
+  InitializeMetadataTable();
   InitializeLocalVariableTLS();
   CacheBinaryName();
   AvoidCVE_2016_2143();

@@ -46,6 +46,8 @@ struct MsanMapUnmapCallback {
       ReleaseMemoryPagesToOS(origin_p, origin_p + size);
     }
   }
+  void OnMetaChunkInit(uptr user_chunk_base, uptr user_map_size,
+                       uptr meta_chunk_base, uptr object_size) {}
 };
 
 #if defined(__mips64)
