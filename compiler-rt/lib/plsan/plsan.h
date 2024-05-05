@@ -36,6 +36,7 @@ bool IsSameObject(Metadata *metadata, const void *p, const void *q);
 void IncRefCount(Metadata *metadata);
 void DecRefCount(Metadata *metadata);
 u8 GetRefCount(Metadata *metadata);
+bool IsAllocated(Metadata *metadata);
 u32 GetAllocTraceID(Metadata *metadata);
 
 void *plsan_malloc(uptr size, StackTrace *stack);

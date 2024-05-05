@@ -63,7 +63,13 @@ extern "C" void __plsan_free_local_variable(void **addr, uptr size,
   void **pp = addr;
   while (pp + 1 <= addr + size / (sizeof(void *))) {
     void *ptr = *pp;
+
     __plsan::Metadata *metadata = __plsan::GetMetadata(ptr);
+    if (!metadata || !__plsan::IsAllocated(metadata)) {
+      pp++;
+      continue;
+    }
+
     __plsan::DecRefCount(metadata);
     if (is_return == false) {
       if (__plsan::GetRefCount(metadata) == 0)

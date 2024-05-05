@@ -80,6 +80,8 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
 
 u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
+bool IsAllocated(Metadata *metadata) { return metadata->IsAllocated(); }
+
 u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
