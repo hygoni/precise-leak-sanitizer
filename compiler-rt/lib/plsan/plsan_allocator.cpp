@@ -87,7 +87,9 @@ u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
   alloc_trace_id = stack;
-  state = (1 << 7);
+  u8 s = (1 << 7);
+  atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), s,
+               memory_order_relaxed);
 }
 
 inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
@@ -95,18 +97,26 @@ inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
 inline __lsan::ChunkTag Metadata::GetLsanTag() const { return lsan_tag; }
 
 inline void Metadata::SetUnallocated() {
+  u8 s = 0;
   requested_size = 0;
   alloc_trace_id = 0;
-  state = 0;
+  atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), s,
+               memory_order_relaxed);
 }
 
-bool Metadata::IsAllocated() const { return state >> 7; }
+bool Metadata::IsAllocated() const {
+  u8 s = atomic_load_relaxed(&state);
+  return s >> 7;
+}
 
 inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
 u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
 
-inline u8 Metadata::GetRefCount() const { return state & ~(1 << 7); }
+inline u8 Metadata::GetRefCount() const {
+  u8 s = atomic_load_relaxed(&state);
+  return s & ~(1 << 7);
+}
 
 inline void Metadata::SetRefCount(u8 val) {
   atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), val,
@@ -114,26 +124,23 @@ inline void Metadata::SetRefCount(u8 val) {
 }
 
 inline void Metadata::IncRefCount() {
-  u8 s = state;
-
+  u8 s;
+  // FIXME: Change state to atomic uint8_t and use atomic_load_relaxed()
   do {
-    if (state == PLSAN_REFCOUNT_MAX) {
-      return;
-    }
-
+    s = atomic_load_relaxed(&state);
+    CHECK(s != (PLSAN_ALLOCATED|PLSAN_REFCOUNT_MAX));
   } while (!atomic_compare_exchange_strong(
       reinterpret_cast<atomic_uint8_t *>(&state), &s, s + 1,
       memory_order_relaxed));
 }
 
 inline void Metadata::DecRefCount() {
-  u8 s = state;
-
+  u8 s;
+  // FIXME: Change state to atomic uint8_t and use atomic_load_relaxed()
   do {
-    if (GetRefCount() == PLSAN_REFCOUNT_MIN) {
-      return;
-    }
-
+    s = atomic_load_relaxed(&state);
+    // reference count should not be zero when decrementing
+    CHECK(s == 0 || (s != (PLSAN_ALLOCATED|PLSAN_REFCOUNT_MIN)));
   } while (!atomic_compare_exchange_strong(
       reinterpret_cast<atomic_uint8_t *>(&state), &s, s - 1,
       memory_order_relaxed));

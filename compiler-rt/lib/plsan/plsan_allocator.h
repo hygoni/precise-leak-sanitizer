@@ -26,6 +26,7 @@
 #error Unsupported platform
 #endif
 
+#define PLSAN_ALLOCATED (1 << (sizeof(state) * 8 - 1))
 #define PLSAN_REFCOUNT_MAX 255
 #define PLSAN_REFCOUNT_MIN 0
 
@@ -33,7 +34,7 @@ namespace __plsan {
 struct Metadata {
 private:
   // msb: allocated, remaining bits: refcount
-  u8 state;
+  atomic_uint8_t state;
   __lsan::ChunkTag lsan_tag : 2;
 #if SANITIZER_WORDSIZE == 64
   uptr requested_size : 54;
