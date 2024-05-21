@@ -78,7 +78,7 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
   return begin <= y && (uptr)y < (uptr)begin + metadata->GetRequestedSize();
 }
 
-u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
+u32 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
 bool IsAllocated(Metadata *metadata) { return metadata->IsAllocated(); }
 
@@ -87,7 +87,7 @@ u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
   alloc_trace_id = stack;
-  state = (1 << 7);
+  state = (1 << 31);
 }
 
 inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
@@ -100,21 +100,21 @@ inline void Metadata::SetUnallocated() {
   state = 0;
 }
 
-bool Metadata::IsAllocated() const { return state >> 7; }
+bool Metadata::IsAllocated() const { return state >> 31; }
 
 inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
 u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
 
-inline u8 Metadata::GetRefCount() const { return state & ~(1 << 7); }
+inline u32 Metadata::GetRefCount() const { return state & ~(1 << 31); }
 
-inline void Metadata::SetRefCount(u8 val) {
-  atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), val,
+inline void Metadata::SetRefCount(u32 val) {
+  atomic_store(reinterpret_cast<atomic_uint32_t *>(&state), val,
                memory_order_relaxed);
 }
 
 inline void Metadata::IncRefCount() {
-  u8 s = state;
+  u32 s = state;
 
   do {
     if (state == PLSAN_REFCOUNT_MAX) {
@@ -122,12 +122,12 @@ inline void Metadata::IncRefCount() {
     }
 
   } while (!atomic_compare_exchange_strong(
-      reinterpret_cast<atomic_uint8_t *>(&state), &s, s + 1,
+      reinterpret_cast<atomic_uint32_t *>(&state), &s, s + 1,
       memory_order_relaxed));
 }
 
 inline void Metadata::DecRefCount() {
-  u8 s = state;
+  u32 s = state;
 
   do {
     if (GetRefCount() == PLSAN_REFCOUNT_MIN) {
@@ -135,7 +135,7 @@ inline void Metadata::DecRefCount() {
     }
 
   } while (!atomic_compare_exchange_strong(
-      reinterpret_cast<atomic_uint8_t *>(&state), &s, s - 1,
+      reinterpret_cast<atomic_uint32_t *>(&state), &s, s - 1,
       memory_order_relaxed));
 }
 

@@ -33,7 +33,7 @@ namespace __plsan {
 struct Metadata {
 private:
   // msb: allocated, remaining bits: refcount
-  u8 state;
+  u32 state;
   __lsan::ChunkTag lsan_tag : 2;
 #if SANITIZER_WORDSIZE == 64
   uptr requested_size : 54;
@@ -53,8 +53,8 @@ public:
   inline u32 GetAllocThreadId() const;
   inline void SetLsanTag(__lsan::ChunkTag tag);
   inline __lsan::ChunkTag GetLsanTag() const;
-  inline u8 GetRefCount() const;
-  inline void SetRefCount(u8 val);
+  inline u32 GetRefCount() const;
+  inline void SetRefCount(u32 val);
   inline void IncRefCount();
   inline void DecRefCount();
 };
