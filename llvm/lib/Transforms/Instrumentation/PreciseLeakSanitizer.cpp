@@ -197,9 +197,10 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
         if (Instruction *argInst = dyn_cast<Instruction>(arg)) {
           if (LoadInst *loadInst = dyn_cast<LoadInst>(argInst)) {
             Value *ptrToPointer = loadInst->getPointerOperand();
-            Builder.CreateStore(
+            StoreInst *InstrumentedInst = Builder.CreateStore(
                 ConstantPointerNull::get(cast<PointerType>(loadInst->getType())),
                 ptrToPointer);
+            InstrumentedInst->setMetadata(Plsan.PlsanMDName, Plsan.PlsanMD);
           }
         }
       }

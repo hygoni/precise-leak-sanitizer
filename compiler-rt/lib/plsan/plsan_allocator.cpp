@@ -78,7 +78,7 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
   return begin <= y && (uptr)y < (uptr)begin + metadata->GetRequestedSize();
 }
 
-u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
+u32 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
 bool IsAllocated(Metadata *metadata) { return metadata->IsAllocated(); }
 
@@ -87,9 +87,8 @@ u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
   alloc_trace_id = stack;
-  u8 s = (1 << 7);
-  atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), s,
-               memory_order_relaxed);
+  u32 s = (1 << 31);
+  atomic_store(&state, s, memory_order_relaxed);
 }
 
 inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
@@ -97,52 +96,49 @@ inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
 inline __lsan::ChunkTag Metadata::GetLsanTag() const { return lsan_tag; }
 
 inline void Metadata::SetUnallocated() {
-  u8 s = 0;
+  u32 s = 0;
   requested_size = 0;
   alloc_trace_id = 0;
-  atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), s,
-               memory_order_relaxed);
+  atomic_store(&state, s, memory_order_relaxed);
 }
 
 bool Metadata::IsAllocated() const {
-  u8 s = atomic_load_relaxed(&state);
-  return s >> 7;
+  u32 s = atomic_load_relaxed(&state);
+  return s >> (sizeof(state) * 8 - 1);
 }
 
 inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
 u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
 
-inline u8 Metadata::GetRefCount() const {
-  u8 s = atomic_load_relaxed(&state);
-  return s & ~(1 << 7);
+inline u32 Metadata::GetRefCount() const {
+  u32 s = atomic_load_relaxed(&state);
+  return s & ~(1 << 31);
 }
 
-inline void Metadata::SetRefCount(u8 val) {
-  atomic_store(reinterpret_cast<atomic_uint8_t *>(&state), val,
-               memory_order_relaxed);
+inline void Metadata::SetRefCount(u32 val) {
+  atomic_store(&state, val, memory_order_relaxed);
 }
 
 inline void Metadata::IncRefCount() {
-  u8 s;
-  // FIXME: Change state to atomic uint8_t and use atomic_load_relaxed()
+  u32 s;
   do {
     s = atomic_load_relaxed(&state);
     CHECK(s != (PLSAN_ALLOCATED|PLSAN_REFCOUNT_MAX));
   } while (!atomic_compare_exchange_strong(
-      reinterpret_cast<atomic_uint8_t *>(&state), &s, s + 1,
+      &state, &s, s + 1,
       memory_order_relaxed));
 }
 
 inline void Metadata::DecRefCount() {
-  u8 s;
-  // FIXME: Change state to atomic uint8_t and use atomic_load_relaxed()
+  u32 s;
   do {
     s = atomic_load_relaxed(&state);
     // reference count should not be zero when decrementing
-    CHECK(s == 0 || (s != (PLSAN_ALLOCATED|PLSAN_REFCOUNT_MIN)));
+    CHECK(s != (PLSAN_ALLOCATED|PLSAN_REFCOUNT_MIN));
+    CHECK(s != 0);
   } while (!atomic_compare_exchange_strong(
-      reinterpret_cast<atomic_uint8_t *>(&state), &s, s - 1,
+      &state, &s, s - 1,
       memory_order_relaxed));
 }
 
