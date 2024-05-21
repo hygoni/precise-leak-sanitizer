@@ -177,10 +177,34 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
     }
   }
 
-  if (FuncName == "llvm.stacksave")
+  if (FuncName == "llvm.stacksave") {
     visitLLVMStacksave(I);
-  if (FuncName == "llvm.stackrestore")
+  } else if (FuncName == "llvm.stackrestore") {
     visitLLVMStackrestore(I);
+  } else if (FuncName == "free" ||
+             // delete and delete[] operators
+             FuncName == "_ZdlPv" ||
+             FuncName == "_ZdaPv" ||
+             FuncName == "_ZdlPvRKSt9nothrow_t" ||
+             FuncName == "_ZdaPvRKSt9nothrow_t") {
+    IRBuilder<> Builder(I.getNextNode());
+    Value *arg = I.getArgOperand(0);
+    if (arg->getType()->isPointerTy()) {
+      // find appropriate alloca instruction that arg is loaded from and then nullify it
+      // this is necessary for sane reference counting,
+      // especially in cases where the same address is allocated after free.
+      if (arg->getType()->isPointerTy()) {
+        if (Instruction *argInst = dyn_cast<Instruction>(arg)) {
+          if (LoadInst *loadInst = dyn_cast<LoadInst>(argInst)) {
+            Value *ptrToPointer = loadInst->getPointerOperand();
+            Builder.CreateStore(
+                ConstantPointerNull::get(cast<PointerType>(loadInst->getType())),
+                ptrToPointer);
+          }
+        }
+      }
+    }
+  }
 
   if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I))
     IntrinToInstrument.push_back(MI);
