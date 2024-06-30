@@ -18,6 +18,12 @@
 #include "sanitizer_common/sanitizer_stacktrace.h"
 #include "sanitizer_common/sanitizer_symbolizer.h"
 
+#define PLSAN_REPORT_COUNT_THRESHOLD 100
+// this counter is intentionally not atomic
+// because it doesn't needs to be precise.
+// for performance, use it in a relaxed way.
+int report_count = 0;
+
 struct LazyCheckInfo {
   __sanitizer::Vector<void *> *RefCountZeroAddrs;
 };
@@ -82,6 +88,9 @@ extern "C" void __plsan_free_local_variable(void **addr, uptr size,
 }
 
 extern "C" void __plsan_lazy_check(void *ret_addr) {
+  if (report_count > PLSAN_REPORT_COUNT_THRESHOLD)
+    return;
+
   __sanitizer::Vector<void *> *lazy_check_addr_list =
       __plsan::local_var_ref_count_zero_list;
 
@@ -90,6 +99,7 @@ extern "C" void __plsan_lazy_check(void *ret_addr) {
       __plsan::Metadata *metadata =
           __plsan::GetMetadata((*lazy_check_addr_list)[i]);
       __lsan::setLeakedLoc(metadata->GetAllocTraceId());
+      report_count++;
       lazy_check_addr_list->PopBack();
     }
   }
@@ -175,8 +185,12 @@ void check_returned_or_stored_value(void *ret_ptr_addr,
 }
 
 void check_memory_leak(Metadata *metadata) {
+  if (report_count > PLSAN_REPORT_COUNT_THRESHOLD)
+    return;
+
   if (metadata && GetRefCount(metadata) == 0) {
     __lsan::setLeakedLoc(metadata->GetAllocTraceId());
+    report_count++;
   }
 }
 
