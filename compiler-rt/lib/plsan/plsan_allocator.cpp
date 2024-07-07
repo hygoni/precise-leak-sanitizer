@@ -60,22 +60,7 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
   if (!metadata || !y)
     return false;
 
-  if (x == y)
-    return true;
-
-  uptr size = metadata->GetRequestedSize();
-  if (size <= (1 << 15)) {
-    // size is always power of two if allocated from the primary
-    uptr a = reinterpret_cast<uptr>(x) & ~(size - 1);
-    uptr b = reinterpret_cast<uptr>(y) & ~(size - 1);
-    return a == b;
-  }
-
-  void *begin = allocator.GetBlockBegin(x);
-  if (!begin)
-    return false;
-
-  return begin <= y && (uptr)y < (uptr)begin + metadata->GetRequestedSize();
+  return (GetMetadata(y) == x);
 }
 
 u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
