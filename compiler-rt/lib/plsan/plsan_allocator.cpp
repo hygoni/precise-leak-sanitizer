@@ -60,7 +60,7 @@ bool IsSameObject(Metadata *metadata, const void *x, const void *y) {
   if (!metadata || !y)
     return false;
 
-  return (GetMetadata(y) == x);
+  return (GetMetadata(y) == metadata);
 }
 
 u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
