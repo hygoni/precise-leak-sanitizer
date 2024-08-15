@@ -16,6 +16,12 @@ $ cmake -DLLVM_ENABLE_PROJECTS="llvm;clang;compiler-rt" \
 $ make -j$(nproc)
 ```
 
+## Test precise-leak
+```bash
+$ cd build
+$ make check-plsan
+```
+
 ## Compile the program with -fsanitize=precise-leak
 
 Just as other sanitizers, passing -fsanitize=precise-leak option enables PreciseLeakSanitizer. PreciseLeakSanitizer automatically enables LeakSanitizer, but it is not intended to be ran with any other sanitizers other than LeakSanitizer. Use clang or clang++ depending on which language you use.
