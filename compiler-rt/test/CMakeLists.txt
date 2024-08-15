@@ -70,7 +70,7 @@ if(COMPILER_RT_CAN_EXECUTE_TESTS)
   endif()
   if(COMPILER_RT_BUILD_SANITIZERS)
     compiler_rt_test_runtime(interception)
-
+    compiler_rt_test_runtime(plsan)
     compiler_rt_test_runtime(lsan)
     # CFI tests require diagnostic mode, which is implemented in UBSan.
     compiler_rt_test_runtime(ubsan cfi)

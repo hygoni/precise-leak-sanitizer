@@ -213,6 +213,7 @@ possibly_dangerous_env_vars = [
     "ASAN_OPTIONS",
     "DFSAN_OPTIONS",
     "HWASAN_OPTIONS",
+    "PLSAN_OPTIONS",
     "LSAN_OPTIONS",
     "MSAN_OPTIONS",
     "UBSAN_OPTIONS",

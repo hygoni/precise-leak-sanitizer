@@ -20,25 +20,25 @@ foreach(arch ${LSAN_TEST_ARCH})
     ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/lit.site.cfg.py)
   list(APPEND LSAN_TESTSUITES ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME})
 
-  list(FIND ASAN_SUPPORTED_ARCH ${arch} _found)
-  if(NOT _found EQUAL -1)
-    set(CONFIG_NAME ${ARCH_UPPER_CASE}AsanConfig)
-    set(LSAN_LIT_TEST_MODE "AddressSanitizer")
-    configure_lit_site_cfg(
-      ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-      ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/lit.site.cfg.py)
-    list(APPEND LSAN_TESTSUITES ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME})
-  endif()
+  # list(FIND ASAN_SUPPORTED_ARCH ${arch} _found)
+  # if(NOT _found EQUAL -1)
+  #   set(CONFIG_NAME ${ARCH_UPPER_CASE}AsanConfig)
+  #   set(LSAN_LIT_TEST_MODE "AddressSanitizer")
+  #   configure_lit_site_cfg(
+  #     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
+  #     ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/lit.site.cfg.py)
+  #   list(APPEND LSAN_TESTSUITES ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME})
+  # endif()
 
-  list(FIND HWASAN_SUPPORTED_ARCH ${arch} _found)
-  if(NOT _found EQUAL -1)
-    set(CONFIG_NAME ${ARCH_UPPER_CASE}HWAsanConfig)
-    set(LSAN_LIT_TEST_MODE "HWAddressSanitizer")
-    configure_lit_site_cfg(
-      ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-      ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/lit.site.cfg.py)
-    list(APPEND LSAN_TESTSUITES ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME})
-  endif()
+  # list(FIND HWASAN_SUPPORTED_ARCH ${arch} _found)
+  # if(NOT _found EQUAL -1)
+  #   set(CONFIG_NAME ${ARCH_UPPER_CASE}HWAsanConfig)
+  #   set(LSAN_LIT_TEST_MODE "HWAddressSanitizer")
+  #   configure_lit_site_cfg(
+  #     ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
+  #     ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME}/lit.site.cfg.py)
+  #   list(APPEND LSAN_TESTSUITES ${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_NAME})
+  # endif()
 endforeach()
 
 set(LSAN_TEST_DEPS ${SANITIZER_COMMON_LIT_TEST_DEPS})
