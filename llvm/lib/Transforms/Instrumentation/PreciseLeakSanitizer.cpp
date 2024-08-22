@@ -107,8 +107,8 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
       BuiltinAllocaStack.top();
 
   // Call __plsan_lazy_check
-  if (isVLAExist)
-    Plsan.CreateCallWithMetaData(Builder, Plsan.LazyCheckFn, {ReturnValue});
+  // if (isVLAExist)
+  //   Plsan.CreateCallWithMetaData(Builder, Plsan.LazyCheckFn, {ReturnValue});
 
   // Call __plsan_free_stack_array, non-variable length array
   for (VarAddrSizeInfo AddrAndSize : TopLocalVarList) {
@@ -135,18 +135,18 @@ void PreciseLeakSanVisitor::visitReturnInst(ReturnInst &I) {
   BuiltinAllocaStack.pop();
 }
 
-Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
-  if (I->user_begin() == I->user_end()) {
-    return I;
-  } else {
-    auto UI = I->user_begin();
-    Value *user = *UI;
-    if (Instruction *userInst = dyn_cast<Instruction>(user)) {
-      return InstructionTraceTopDown(userInst);
-    }
-    return NULL;
-  }
-}
+// Instruction *PreciseLeakSanVisitor::InstructionTraceTopDown(Instruction *I) {
+//   if (I->user_begin() == I->user_end()) {
+//     return I;
+//   } else {
+//     auto UI = I->user_begin();
+//     Value *user = *UI;
+//     if (Instruction *userInst = dyn_cast<Instruction>(user)) {
+//       return InstructionTraceTopDown(userInst);
+//     }
+//     return NULL;
+//   }
+// }
 
 void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
   StringRef FuncName;
@@ -156,26 +156,26 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
   else
     return;
 
-  if (I.getType()->isPointerTy()) {
-    Value *RetAddr = &I;
-    Instruction *LastInst = InstructionTraceTopDown(&I);
-    IRBuilder<> Builder(LastInst);
-    if (StoreInst *Inst = dyn_cast<StoreInst>(LastInst)) {
-      Value *CompareAddr = Inst->getValueOperand();
-      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
-                                   {RetAddr, CompareAddr});
-    } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
-      Value *CompareAddr = Inst->getReturnValue();
-      // if return value is void
-      if (CompareAddr == NULL)
-        CompareAddr = ConstantPointerNull::get(Plsan.VoidPtrTy);
-      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
-                                   {RetAddr, CompareAddr});
-    } else {
-      Builder.SetInsertPoint(I.getNextNode());
-      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
-    }
-  }
+  // if (I.getType()->isPointerTy()) {
+  //   Value *RetAddr = &I;
+  //   Instruction *LastInst = InstructionTraceTopDown(&I);
+  //   IRBuilder<> Builder(LastInst);
+  //   if (StoreInst *Inst = dyn_cast<StoreInst>(LastInst)) {
+  //     Value *CompareAddr = Inst->getValueOperand();
+  //     Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+  //                                  {RetAddr, CompareAddr});
+  //   } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
+  //     Value *CompareAddr = Inst->getReturnValue();
+  //     // if return value is void
+  //     if (CompareAddr == NULL)
+  //       CompareAddr = ConstantPointerNull::get(Plsan.VoidPtrTy);
+  //     Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+  //                                  {RetAddr, CompareAddr});
+  //   } else {
+  //     Builder.SetInsertPoint(I.getNextNode());
+  //     Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
+  //   }
+  // }
 
   if (FuncName == "llvm.stacksave")
     visitLLVMStacksave(I);

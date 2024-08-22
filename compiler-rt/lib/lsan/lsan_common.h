@@ -141,6 +141,9 @@ class LsanMetadata {
   void set_tag(ChunkTag value);
   uptr requested_size() const;
   u32 stack_trace_id() const;
+  u32 leak_trace_id() const;
+  bool is_valid() const;
+  bool leak_trace_id_valid() const;
 
  private:
   void *metadata_;
@@ -194,6 +197,7 @@ struct LeakedChunk {
 using LeakedChunks = InternalMmapVector<LeakedChunk>;
 
 struct Leak {
+  uptr chunk;
   u32 id;
   uptr hit_count;
   uptr total_size;

@@ -327,6 +327,12 @@ u32 LsanMetadata::stack_trace_id() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->stack_trace_id;
 }
 
+u32 LsanMetadata::leak_trace_id() const { return 0; }
+
+bool LsanMetadata::is_valid() const { return 0; }
+
+bool LsanMetadata::leak_trace_id_valid() const { return 0; }
+
 void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   allocator.ForEachChunk(callback, arg);
 }

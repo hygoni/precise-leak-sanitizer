@@ -38,6 +38,7 @@ void DecRefCount(Metadata *metadata);
 u8 GetRefCount(Metadata *metadata);
 bool IsAllocated(Metadata *metadata);
 u32 GetAllocTraceID(Metadata *metadata);
+void SetLeaked(Metadata *metadata);
 
 void *plsan_malloc(uptr size, StackTrace *stack);
 void *plsan_calloc(uptr nmemb, uptr size, StackTrace *stack);

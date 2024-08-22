@@ -868,7 +868,7 @@ void LeakReport::AddLeakedChunks(const LeakedChunks &chunks) {
     if (i == leaks_.size()) {
       if (leaks_.size() == kMaxLeaksConsidered)
         return;
-      Leak leak = {next_id_++,         /* hit_count */ 1,
+      Leak leak = {chunk, next_id_++,         /* hit_count */ 1,
                    leaked_size,        stack_trace_id,
                    is_directly_leaked, /* is_suppressed */ false};
       leaks_.push_back(leak);
@@ -936,21 +936,34 @@ void LeakReport::PrintReportForLeak(uptr index) {
 }
 
 void LeakReport::PrintReportForPreciseLeak(uptr index) {
-  u32 stack_trace_id = leaks_[index].stack_trace_id;
+  uptr chunk = leaks_[index].chunk;
 
-  uptr i = checkPreciseLeak(stack_trace_id);
-  if (i == PreciseLeakedLoc.Size())
-    return;
+  LsanMetadata m(chunk);
 
-  Decorator d;
-  for (uptr j = 1; j != PreciseLeakedLoc[i].Size(); j++) {
+  if (!m.allocated()) 
+      return;
+
+  if (!m.is_valid()) {
+    Decorator d;
     Printf("%s", d.Error());
     Printf("    Last reference to the object(s) lost at:\n");
     Printf("%s", d.Default());
+    
+    CHECK(m.stack_trace_id());
+    StackDepotGet(m.stack_trace_id()).Print();
+  } else {
+    if (!m.leak_trace_id_valid())
+      return;
 
-    CHECK(PreciseLeakedLoc[i][j]);
-    StackDepotGet(PreciseLeakedLoc[i][j]).Print();
+    Decorator d;
+    Printf("%s", d.Error());
+    Printf("    Last reference to the object(s) lost at:\n");
+    Printf("%s", d.Default());
+    
+    CHECK(m.leak_trace_id());
+    StackDepotGet(m.leak_trace_id()).Print();
   }
+
 }
 
 void LeakReport::PrintLeakedObjectsForLeak(uptr index) {

@@ -42,14 +42,28 @@ private:
   uptr padding : 22;
 #endif
   u32 alloc_trace_id;
+  u32 leak_trace_id;
+  u8 is_valid : 1;
+  u8 leak_trace_valid : 1;
 
 public:
   inline void SetAllocated(u32 stack, u64 size);
   inline void SetUnallocated();
 
+  inline void SetLeaked();
+
+  inline void InitLeakTraceValid();
+  inline void SetLeakTraceValid();
+  inline bool IsLeakTraceValid();
+
+  inline void SetValid();
+  inline void SetInvalid();
+
   inline bool IsAllocated() const;
+  inline bool IsValid() const;
   inline u64 GetRequestedSize() const;
   u32 GetAllocTraceId() const;
+  u32 GetLeakTraceId() const;
   inline u32 GetAllocThreadId() const;
   inline void SetLsanTag(__lsan::ChunkTag tag);
   inline __lsan::ChunkTag GetLsanTag() const;

@@ -77,12 +77,8 @@ extern "C" void __plsan_free_local_variable(void **addr, uptr size,
     }
 
     __plsan::DecRefCount(metadata);
-    if (is_return == false) {
-      if (__plsan::GetRefCount(metadata) == 0)
-        __plsan::local_var_ref_count_zero_list->PushBack(ptr);
-    } else if (!__plsan::IsSameObject(metadata, ptr, ret_addr)) {
-      __plsan::check_memory_leak(metadata);
-    }
+    __plsan::check_memory_leak(metadata);
+
     pp++;
   }
 }
@@ -190,6 +186,7 @@ void check_memory_leak(Metadata *metadata) {
 
   if (metadata && GetRefCount(metadata) == 0) {
     __lsan::setLeakedLoc(metadata->GetAllocTraceId());
+    __plsan::SetLeaked(metadata);
     report_count++;
   }
 }

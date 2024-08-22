@@ -1187,6 +1187,12 @@ u32 LsanMetadata::stack_trace_id() const {
   return stack;
 }
 
+u32 LsanMetadata::leak_trace_id() const { return 0; }
+
+bool LsanMetadata::is_valid() const { return 0; }
+
+bool LsanMetadata::leak_trace_id_valid() const { return 0; }
+
 void ForEachChunk(ForEachChunkCallback callback, void *arg) {
   __asan::get_allocator().ForEachChunk(callback, arg);
 }

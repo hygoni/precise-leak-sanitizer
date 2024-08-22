@@ -67,13 +67,35 @@ u8 GetRefCount(Metadata *metadata) { return metadata->GetRefCount(); }
 
 bool IsAllocated(Metadata *metadata) { return metadata->IsAllocated(); }
 
+bool IsValid(Metadata *metadata) { return metadata->IsValid(); }
+
 u32 GetAllocTraceID(Metadata *metadata) { return metadata->GetAllocTraceId(); }
+
+void SetLeaked(Metadata *metadata) { metadata->SetLeaked(); }
 
 inline void Metadata::SetAllocated(u32 stack, u64 size) {
   requested_size = size;
   alloc_trace_id = stack;
   state = (1 << 7);
 }
+
+inline void Metadata::SetLeaked() {
+  BufferedStackTrace stack;
+  stack.Unwind(StackTrace::GetCurrentPc(), GET_CURRENT_FRAME(), nullptr, true);
+  u32 leak_stack_trace_id = StackDepotPut(stack);
+  leak_trace_id = leak_stack_trace_id;
+  SetLeakTraceValid();
+}
+
+inline void Metadata::InitLeakTraceValid() { leak_trace_valid = 0; }
+
+inline void Metadata::SetLeakTraceValid() { leak_trace_valid = 1; }
+
+inline bool Metadata::IsLeakTraceValid() { return leak_trace_valid; }
+
+inline void Metadata::SetValid() { is_valid = 1; }
+
+inline void Metadata::SetInvalid() { is_valid = 0; }
 
 inline void Metadata::SetLsanTag(__lsan::ChunkTag tag) { lsan_tag = tag; }
 
@@ -87,9 +109,13 @@ inline void Metadata::SetUnallocated() {
 
 bool Metadata::IsAllocated() const { return state >> 7; }
 
+bool Metadata::IsValid() const { return is_valid; }
+
 inline u64 Metadata::GetRequestedSize() const { return requested_size; }
 
 u32 Metadata::GetAllocTraceId() const { return alloc_trace_id; }
+
+u32 Metadata::GetLeakTraceId() const { return leak_trace_id; }
 
 inline u8 Metadata::GetRefCount() const { return state & ~(1 << 7); }
 
@@ -102,6 +128,9 @@ inline void Metadata::IncRefCount() {
   u8 s = state;
 
   do {
+    SetValid();
+    InitLeakTraceValid();
+
     if (state == PLSAN_REFCOUNT_MAX) {
       return;
     }
@@ -155,6 +184,8 @@ static void RegisterAllocation(const StackTrace *stack, void *p, uptr size) {
   m->SetAllocated(StackDepotPut(*stack), size);
   m->SetLsanTag(__lsan::DisabledInThisThread() ? __lsan::kIgnored
                                                : __lsan::kDirectlyLeaked);
+  m->SetInvalid();
+  m->InitLeakTraceValid();
   RunMallocHooks(p, size);
   if (!allocator.FromPrimary(p)) {
     __plsan_set_metabase(reinterpret_cast<uptr>(p), reinterpret_cast<uptr>(m),
@@ -474,6 +505,18 @@ uptr LsanMetadata::requested_size() const {
 
 u32 LsanMetadata::stack_trace_id() const {
   return reinterpret_cast<__plsan::Metadata *>(metadata_)->GetAllocTraceId();
+}
+
+u32 LsanMetadata::leak_trace_id() const {
+  return reinterpret_cast<__plsan::Metadata *>(metadata_)->GetLeakTraceId();
+}
+
+bool LsanMetadata::is_valid() const {
+  return reinterpret_cast<__plsan::Metadata *>(metadata_)->IsValid();
+}
+
+bool LsanMetadata::leak_trace_id_valid() const {
+  return reinterpret_cast<__plsan::Metadata *>(metadata_)->IsLeakTraceValid();
 }
 
 IgnoreObjectResult IgnoreObject(const void *p) {
