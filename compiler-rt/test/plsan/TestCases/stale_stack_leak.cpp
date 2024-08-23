@@ -14,7 +14,7 @@
 //
 // x86 passes parameters through stack that may lead to false negatives
 // The same applies to s390x register save areas.
-// UNSUPPORTED: i686,target={{(x86|powerpc64|arm|s390x).*}}
+// UNSUPPORTED: i686,target={{(x86|powerpc64|arm|s390x)}}
 
 #include "sanitizer_common/print_address.h"
 #include <stdio.h>
@@ -49,4 +49,6 @@ ConfirmPointerHasSurvived() {
 }
 
 // CHECK: Last reference to the object(s) lost at
-// --CHECK: stale_stack_leak.cpp:
+// CHECK: stale_stack_leak.cpp:34:3
+// CHECK-sanity: Test alloc: [[ADDR:0x[0-9,a-f]+]]
+// CHECK-sanity: Value after LSan: [[ADDR]]

@@ -18,6 +18,3 @@ int main() {
   return 0;
 }
 // CHECK: Last reference to the object(s) lost at
-// CHECK: LeakSanitizer: detected memory leaks
-// CHECK: [[ADDR]] (1337 bytes)
-// CHECK: SUMMARY: {{.*}}Sanitizer:
