@@ -85,11 +85,11 @@ struct PlsanMapUnmapCallback {
 #if SANITIZER_APPLE
 const uptr kAllocatorSpace = 0x600000000000ULL;
 // const uptr kAllocatorSize  = 0x40000000000ULL;  // 4T.
-const uptr kAllocatorSize = 0x2000000000ULL; // 128G.
+const uptr kAllocatorSize = 0x8000000000ULL; // 512G.
 #else
 const uptr kAllocatorSpace = 0x500000000000ULL;
 // const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
-const uptr kAllocatorSize = 0x2000000000ULL; // 128G.
+const uptr kAllocatorSize = 0x8000000000ULL; // 512G.
 #endif
 const uptr kAllocatorEnd = kAllocatorSpace + kAllocatorSize;
 
