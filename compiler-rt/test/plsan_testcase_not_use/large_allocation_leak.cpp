@@ -4,11 +4,11 @@
 
 // For 32 bit LSan it's pretty likely that large chunks are "reachable" from some
 // internal data structures (e.g. Glibc global data).
-// UNSUPPORTED: i686,target={{(x86|arm)}}
+// UNSUPPORTED: i686,target={{(x86|arm).*}}
 
+#include "sanitizer_common/print_address.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "sanitizer_common/print_address.h"
 
 int main() {
   // maxsize in primary allocator is always less than this (1 << 25).

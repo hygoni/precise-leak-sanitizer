@@ -1,6 +1,6 @@
 // Test for __lsan_ignore_object().
 // RUN: %clang_lsan %s -o %t
-// RUN: %env_lsan_opts=report_objects=1:use_registers=0:use_stacks=0 not %run %t 2>&1 | FileCheck --check-prefixes=CHECK-a,CHECK-b,CHECK-c,CHECK-ap,CHECK-bp,CHECK-cp %s
+// RUN: %env_lsan_opts=report_objects=1:use_registers=0:use_stacks=0 not %run %t 2>&1 | FileCheck %s
 
 // Investigate why it does not fail with use_stack=0
 // UNSUPPORTED: arm-linux || armhf-linux
@@ -21,9 +21,6 @@ int main() {
   __lsan_ignore_object(p);
   return 0;
 }
-// CHECK-a: ignore_object.c:15:14
-// CHECK-b: ignore_object.c:17:8
-// CHECK-c: ignore_object.c:19:22
-// CHECK-ap: ignore_object.c:15:10
-// CHECK-bp: ignore_object.c:22:3
-// CHECK-cp: ignore_object.c:22:3
+// CHECK: Test alloc: [[ADDR:.*]].
+// CHECK: Last reference to the object(s) lost at
+// CHECK: ignore_object.c:22:3

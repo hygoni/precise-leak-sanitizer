@@ -53,5 +53,5 @@ int main(int argc, char **argv) {
 }
 
 // LEAK: LeakSanitizer: detected memory leaks
-// LEAK123: create_thread_leak.cpp:36:7
-// LEAK234: create_thread_leak.cpp:24:3
+// LEAK123: create_thread_leak.cpp:24:3
+// LEAK234: create_thread_leak.cpp:52:3

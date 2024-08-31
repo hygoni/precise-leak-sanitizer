@@ -26,4 +26,4 @@ int main() {
 }
 
 // CHECK-ERROR: Last reference to the object(s) lost at
-// CHECK-ERROR: log-path_test.cpp
+// CHECK-ERROR: log-path_test.cpp:25:3

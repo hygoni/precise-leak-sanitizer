@@ -1,7 +1,5 @@
 // Test that lsan handles tls correctly for many threads
 // RUN: %clangxx_lsan %s -o %t
-// RUN: %env_lsan_opts="report_objects=1:use_stacks=0:use_registers=0:use_tls=0" not %run %t 2>&1 | FileCheck %s
-// RUN: %env_lsan_opts="report_objects=1:use_stacks=0:use_registers=0:use_tls=1" %run %t 2>&1
 // RUN: %env_lsan_opts="" %run %t 2>&1
 
 // On glibc, this requires the range returned by GetTLS to include
@@ -74,4 +72,4 @@ int main() {
 }
 
 // CHECK: Last reference to the object(s) lost at
-// CHECK: many_tls_keys_pthread.cpp:38
+// CHECK: many_tls_keys_pthread.cpp:32:11

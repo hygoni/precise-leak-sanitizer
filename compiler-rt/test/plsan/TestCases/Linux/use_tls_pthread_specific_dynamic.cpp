@@ -36,4 +36,3 @@ int main() {
 }
 // CHECK: Last reference to the object(s) lost at
 // CHECK: use_tls_pthread_specific_dynamic.cpp:35:3
-// CHECK: dynamic

@@ -21,5 +21,5 @@ int main(int argc, char *argv[]) {
   argc_copy = argc;
   return 0;
 }
-
+// CHECK: Last reference to the object(s) lost at
 // CHECK: link_turned_off.cpp:22:3

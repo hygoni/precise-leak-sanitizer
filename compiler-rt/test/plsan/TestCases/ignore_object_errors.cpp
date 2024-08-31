@@ -17,4 +17,5 @@ int main() {
   return 0;
 }
 // CHECK: Test alloc: [[ADDR:.*]].
+// CHECK-NOT: ignore_object_errors.cpp:17:3
 // CHECK-NOT: SUMMARY: {{.*}} leaked

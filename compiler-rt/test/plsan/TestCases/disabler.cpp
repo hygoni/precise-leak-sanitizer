@@ -21,4 +21,6 @@ int main() {
 }
 
 // CHECK: Test alloc p: [[ADDR:.*]].
+// CHECK: LeakSanitizer: detected memory leaks
+// CHECK: disabler.cpp:20:3
 // CHECK-NOT: [[ADDR]]

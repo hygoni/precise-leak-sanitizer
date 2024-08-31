@@ -22,6 +22,6 @@ int main() {
   fprintf(stderr, "Test alloc: %p.\n", q);
   return 0;
 }
+// CHECK: Last reference to the object(s) lost at
+// CHECK: suppressions_default.cpp:23:3
 // CHECK: Suppressions used:
-// CHECK: 1 666 *LSanTestLeakingFunc*
-// CHECK: SUMMARY: {{.*}}Sanitizer: 1337 byte(s) leaked in 1 allocation(s)

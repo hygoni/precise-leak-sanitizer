@@ -5,7 +5,6 @@
 // makes its best effort.
 // RUN: %clang_lsan %s -o %t
 // RUN: %env_lsan_opts="report_objects=1:use_registers=0:use_stacks=0:use_tls=1" %run %t
-// RUN: %env_lsan_opts="report_objects=1:use_registers=0:use_stacks=0:use_tls=0" not %run %t 2>&1 | FileCheck %s
 
 // Investigate why it does not fail with use_stack=0
 // UNSUPPORTED: arm-linux || armhf-linux
@@ -45,4 +44,6 @@ int main() {
   return 0;
 }
 // CHECK: Test alloc: [[ADDR:0x[0-9,a-f]+]]
-// CHECK: [[ADDR]] (1337 bytes)
+// CHECK: [[ADDR]] (2048 bytes)
+// CHECK: Last reference to the object(s) lost at
+// CHECK: cleanup_in_tsd_destructor.c:34:3

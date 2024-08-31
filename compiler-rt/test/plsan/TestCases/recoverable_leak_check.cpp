@@ -22,12 +22,13 @@ int main(int argc, char *argv[]) {
 // CHECK: Test alloc:
 
   assert(__lsan_do_recoverable_leak_check() == 1);
-// CHECK: SUMMARY: {{.*}}Sanitizer: 1337 byte
+// CHECK: recoverable_leak_check.cpp:21:3
 
   // Test that we correctly reset chunk tags.
   p = 0;
   assert(__lsan_do_recoverable_leak_check() == 1);
-// CHECK: SUMMARY: {{.*}}Sanitizer: 1360 byte
+// CHECK: recoverable_leak_check.cpp:21:3
+// CHECK: recoverable_leak_check.cpp:28:5
 
   _exit(0);
 }

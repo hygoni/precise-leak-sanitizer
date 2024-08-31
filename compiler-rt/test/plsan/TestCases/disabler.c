@@ -23,4 +23,5 @@ int main() {
   fprintf(stderr, "Test alloc: %p.\n", q);
   return 0;
 }
+// CHECK: LeakSanitizer: detected memory leaks
 // CHECK: disabler.c:24:3

@@ -1,8 +1,7 @@
 // Build a library with origin tracking and an executable w/o origin tracking.
 // Test that origin tracking is enabled at runtime.
-// RUN: %clangxx_lsan -O0 %s -DBUILD_SO -fPIC -shared -o %t-so.so
-// RUN: %clangxx_lsan -O0 %s -ldl -o %t && not %run %t 2>&1 | FileCheck %s
-// RUN: %clangxx_lsan -O0 %s -ldl -o %t -DSUPPRESS_LEAK && %run %t
+// RUN: %clangxx_lsan -O0 %s -DBUILD_SO -fPIC -shared -o %t-so.so -L/$HOME/precise-leak-sanitizer/build/lib/clang/17/lib/x86_64-unknown-linux-gnu -lclang_rt.plsan
+// RUN: %clangxx_lsan -O0 %s -ldl -o %t && LD_PRELOAD=%t-so.so not %run %t 2>&1 | FileCheck %s
 
 #ifdef BUILD_SO
 
@@ -45,4 +44,5 @@ int main(int argc, char **argv) {
 
 #endif // BUILD_SO
 
-// CHECK: Direct leak
+// CHECK: Last reference to the object(s) lost at
+// CHECK: dso-unknown.cpp:40

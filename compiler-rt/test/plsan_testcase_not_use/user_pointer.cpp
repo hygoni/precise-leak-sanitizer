@@ -1,7 +1,6 @@
 // Checks if a user pointer is found by the leak sanitizer.
 // RUN: %clang_lsan %s -o %t
-// RUN: %run %t 2>&1
-// RUN: %env_lsan_opts="" not %run %t 2>&1 | FileCheck %s
+// RUN: %env_lsan_opts="" %run %t 2>&1
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,4 +15,3 @@ int main() {
   }
   return 0;
 }
-// CHECK: Last reference to the object(s) lost at

@@ -14,7 +14,7 @@
 //
 // x86 passes parameters through stack that may lead to false negatives
 // The same applies to s390x register save areas.
-// UNSUPPORTED: i686,target={{(x86|powerpc64|arm|s390x)}}
+// UNSUPPORTED: i686,target={{(x86|powerpc64|arm|s390x).*}}
 
 #include "sanitizer_common/print_address.h"
 #include <stdio.h>

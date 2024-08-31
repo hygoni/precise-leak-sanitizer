@@ -28,5 +28,5 @@ int main(int argc, char **argv) {
   return 0;
 }
 // CHECK-print: Suppressions used:
-// CHECK-print: 1 666 *LSanTestLeakingFunc*
+// CHECK-print: 1 1024 *LSanTestLeakingFunc*
 // CHECK-dont-print-NOT: Suppressions used:
