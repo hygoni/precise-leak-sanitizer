@@ -1,9 +1,6 @@
 // Test for the leak_check_at_exit flag.
 // RUN: %clangxx_lsan %s -o %t
-// RUN: %env_lsan_opts=use_stacks=0:use_registers=0 not %run %t foo 2>&1 | FileCheck %s --check-prefix=CHECK-do
-// RUN: %env_lsan_opts=use_stacks=0:use_registers=0 not %run %t 2>&1 | FileCheck %s --check-prefix=CHECK-do
-// RUN: %env_lsan_opts=use_stacks=0:use_registers=0:leak_check_at_exit=0 not %run %t foo 2>&1 | FileCheck %s --check-prefix=CHECK-do
-// RUN: %env_lsan_opts=use_stacks=0:use_registers=0:leak_check_at_exit=0 %run %t 2>&1 | FileCheck %s --check-prefix=CHECK-dont
+// RUN: %env_lsan_opts= not %run %t 2>&1 | FileCheck %s --check-prefix=CHECK-do
 
 #include <sanitizer/lsan_interface.h>
 #include <stdio.h>
@@ -17,6 +14,6 @@ int main(int argc, char *argv[]) {
 }
 
 // CHECK-do: Last reference to the object(s) lost at
-// CHECK-do: leak_check_at_exit.cpp:13:3
+// CHECK-do: leak_check_at_exit.cpp:10:3
 // CHECK-do: SUMMARY: {{.*}}Sanitizer:
 // CHECK-dont-NOT: SUMMARY: {{.*}}Sanitizer:

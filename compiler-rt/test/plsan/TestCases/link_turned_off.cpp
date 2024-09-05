@@ -1,7 +1,7 @@
 // Test for disabling LSan at link-time.
 // RUN: %clangxx_lsan %s -o %t
-// RUN: %env_lsan_opts=use_stacks=0:use_registers=0 %run %t
-// RUN: %env_lsan_opts=use_stacks=0:use_registers=0 not %run %t foo 2>&1 | FileCheck %s
+// RUN: %env_lsan_opts= %run %t
+// RUN: %env_lsan_opts= not %run %t foo 2>&1 | FileCheck %s
 //
 // UNSUPPORTED: darwin
 

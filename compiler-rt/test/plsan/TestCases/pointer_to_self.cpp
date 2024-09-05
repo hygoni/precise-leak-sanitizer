@@ -1,7 +1,7 @@
 // Regression test: pointers to self should not confuse LSan into thinking the
 // object is indirectly leaked. Only external pointers count.
 // RUN: %clangxx_lsan %s -o %t
-// RUN: %env_lsan_opts="" not %run %t 2>&1 | FileCheck %s
+// RUN: %env_lsan_opts= not %run %t 2>&1 | FileCheck %s
 
 #include "sanitizer_common/print_address.h"
 #include <stdio.h>

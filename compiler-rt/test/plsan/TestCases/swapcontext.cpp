@@ -2,6 +2,8 @@
 // memory. Make sure we don't report these leaks.
 
 // RUN: %clangxx_lsan %s -o %t
+// RUN: %env_lsan_opts= %run %t 2>&1
+// RUN: %env_lsan_opts= not %run %t foo 2>&1 | FileCheck %s
 // This case plsan can report leak correctly to stderr, but FileCheck can't get stderr
 // Missing 'getcontext' and 'makecontext' on Android.
 // UNSUPPORTED: target={{(arm|aarch64|loongarch64|powerpc64).*}},android
