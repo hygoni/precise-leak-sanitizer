@@ -85,6 +85,7 @@ public:
   void visitStoreInst(StoreInst &I);
   void visitReturnInst(ReturnInst &I);
   void visitCallInst(CallInst &I);
+  void visitInvokeInst(InvokeInst &I);
   void visitMemIntrinsics(MemIntrinsic &I);
   void pushNewLocalVarListStack();
   void pushNewBuiltinAllocaStack();

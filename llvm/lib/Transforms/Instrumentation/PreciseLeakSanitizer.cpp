@@ -3,6 +3,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -184,6 +185,41 @@ void PreciseLeakSanVisitor::visitCallInst(CallInst &I) {
 
   if (MemIntrinsic *MI = dyn_cast<MemIntrinsic>(&I))
     IntrinToInstrument.push_back(MI);
+}
+
+void PreciseLeakSanVisitor::visitInvokeInst(InvokeInst &I) {
+  if (I.getType()->isPointerTy()) {
+    Value *RetAddr = &I;
+    Instruction *LastInst = InstructionTraceTopDown(&I);
+    IRBuilder<> Builder(LastInst);
+    if (StoreInst *Inst = dyn_cast<StoreInst>(LastInst)) {
+      Value *CompareAddr = Inst->getValueOperand();
+      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+                                   {RetAddr, CompareAddr});
+    } else if (ReturnInst *Inst = dyn_cast<ReturnInst>(LastInst)) {
+      Value *CompareAddr = Inst->getReturnValue();
+      // if return value is void
+      if (CompareAddr == NULL)
+        CompareAddr = ConstantPointerNull::get(Plsan.VoidPtrTy);
+      Plsan.CreateCallWithMetaData(Builder, Plsan.CheckReturnedOrStoredValueFn,
+                                   {RetAddr, CompareAddr});
+    } else {
+      Instruction *nextInst = I.getNextNode();
+      if (nextInst) {
+        Builder.SetInsertPoint(I.getNextNode());
+        Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
+      } else {
+        BasicBlock *normalBB = I.getNormalDest();
+        BasicBlock *unwindBB = I.getUnwindDest();
+        Builder.SetInsertPoint(normalBB->getFirstNonPHI());
+        Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
+        // errs() << I << "\n";
+        // errs() << *unwindBB << "\n";
+        // Builder.SetInsertPoint(unwindBB->getFirstNonPHI());
+        // Plsan.CreateCallWithMetaData(Builder, Plsan.CheckMemoryLeakFn, {RetAddr});
+      }
+    }
+  }
 }
 
 void PreciseLeakSanVisitor::visitMemIntrinsics(MemIntrinsic &I) {
