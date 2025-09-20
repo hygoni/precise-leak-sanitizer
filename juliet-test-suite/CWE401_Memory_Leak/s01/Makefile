@@ -1,9 +1,9 @@
-CC=/usr/bin/gcc
-CPP=/usr/bin/g++
-DEBUG=-g
-CFLAGS=-c
-LFLAGS=-lpthread -lm
-LD=ld
+CC=../../../build/bin/clang
+CPP=../../../build/bin/clang++
+DEBUG=-g -fsanitize=precise-leak
+CFLAGS=-c -g -fsanitize=precise-leak
+LFLAGS=-lpthread -lm -fsanitize=precise-leak
+LD=../../../build/bin/clang
 INCLUDE_MAIN=-DINCLUDEMAIN
 
 INCLUDES=-I ../../testcasesupport
