@@ -314,13 +314,15 @@ void *plsan_calloc(uptr nmemb, uptr size, StackTrace *stack) {
 }
 
 void *plsan_realloc(void *p, uptr size, StackTrace *stack) {
-  if (!p)
-    SetErrnoOnNull(Allocate(stack, size, sizeof(u64)));
   if (size == 0) {
     Deallocate(p);
     return nullptr;
   }
-  return SetErrnoOnNull(Reallocate(stack, p, size, 1));
+
+  if (!p)
+	  return SetErrnoOnNull(Allocate(stack, size, sizeof(u64)));
+  else
+	  return SetErrnoOnNull(Reallocate(stack, p, size, 1));
 }
 
 void *plsan_reallocarray(void *p, uptr n, uptr size, StackTrace *stack) {
