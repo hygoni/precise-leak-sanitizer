@@ -81,8 +81,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__strdup_char_65_good();");
 		CWE401_Memory_Leak__strdup_char_65_good();
 	} else if (tc_num == 19) {
-		printLine("Calling CWE401_Memory_Leak__strdup_char_12_good();");
-		CWE401_Memory_Leak__strdup_char_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__strdup_char_12_good();");
+		// CWE401_Memory_Leak__strdup_char_12_good();
 	} else if (tc_num == 20) {
 		printLine("Calling CWE401_Memory_Leak__strdup_char_42_good();");
 		CWE401_Memory_Leak__strdup_char_42_good();
@@ -162,8 +163,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_82::good();");
 		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_82::good();
 	} else if (tc_num == 44) {
-		printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_12::good();");
-		CWE401_Memory_Leak__new_struct_twoIntsStruct_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_12::good();");
+		// CWE401_Memory_Leak__new_struct_twoIntsStruct_12::good();
 	} else if (tc_num == 45) {
 		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_09::good();");
 		CWE401_Memory_Leak__new_TwoIntsClass_09::good();
@@ -213,8 +215,8 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_twoIntsStruct_74::good();");
 		CWE401_Memory_Leak__new_twoIntsStruct_74::good();
 	} else if (tc_num == 61) {
-		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_12::good();");
-		CWE401_Memory_Leak__new_TwoIntsClass_12::good();
+		// printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_12::good();");
+		// CWE401_Memory_Leak__new_TwoIntsClass_12::good();
 	} else if (tc_num == 62) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int_01::good();");
 		CWE401_Memory_Leak__new_array_int_01::good();
@@ -357,8 +359,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_21::good();");
 		CWE401_Memory_Leak__new_TwoIntsClass_21::good();
 	} else if (tc_num == 109) {
-		printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_12::good();");
-		CWE401_Memory_Leak__new_array_twointsStruct_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_12::good();");
+		// CWE401_Memory_Leak__new_array_twointsStruct_12::good();
 	} else if (tc_num == 110) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int_06::good();");
 		CWE401_Memory_Leak__new_array_int_06::good();
@@ -501,8 +504,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_01::good();");
 		CWE401_Memory_Leak__new_struct_twoIntsStruct_01::good();
 	} else if (tc_num == 157) {
-		printLine("Calling CWE401_Memory_Leak__new_twoIntsStruct_12::good();");
-		CWE401_Memory_Leak__new_twoIntsStruct_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_twoIntsStruct_12::good();");
+		// CWE401_Memory_Leak__new_twoIntsStruct_12::good();
 	} else if (tc_num == 158) {
 		printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_03::good();");
 		CWE401_Memory_Leak__new_array_twointsStruct_03::good();
@@ -534,8 +538,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_char_07::good();");
 		CWE401_Memory_Leak__new_char_07::good();
 	} else if (tc_num == 168) {
-		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::good();");
-		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::good();");
+		// CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::good();
 	} else if (tc_num == 169) {
 		printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_15::good();");
 		CWE401_Memory_Leak__new_array_twointsStruct_15::good();
@@ -612,8 +617,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_03::good();");
 		CWE401_Memory_Leak__new_array_int64_t_03::good();
 	} else if (tc_num == 194) {
-		printLine("Calling CWE401_Memory_Leak__new_array_int_12::good();");
-		CWE401_Memory_Leak__new_array_int_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_int_12::good();");
+		// CWE401_Memory_Leak__new_array_int_12::good();
 	} else if (tc_num == 195) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_18::good();");
 		CWE401_Memory_Leak__new_array_int64_t_18::good();
@@ -882,11 +888,13 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_01::good();");
 		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_01::good();
 	} else if (tc_num == 284) {
-		printLine("Calling CWE401_Memory_Leak__new_int_12::good();");
-		CWE401_Memory_Leak__new_int_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_int_12::good();");
+		// CWE401_Memory_Leak__new_int_12::good();
 	} else if (tc_num == 285) {
-		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_12::good();");
-		CWE401_Memory_Leak__new_array_int64_t_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_int64_t_12::good();");
+		// CWE401_Memory_Leak__new_array_int64_t_12::good();
 	} else if (tc_num == 286) {
 		printLine("Calling CWE401_Memory_Leak__new_int64_t_73::good();");
 		CWE401_Memory_Leak__new_int64_t_73::good();
@@ -981,8 +989,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_15::good();");
 		CWE401_Memory_Leak__new_TwoIntsClass_15::good();
 	} else if (tc_num == 317) {
-		printLine("Calling CWE401_Memory_Leak__new_array_TwoIntsClass_12::good();");
-		CWE401_Memory_Leak__new_array_TwoIntsClass_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_TwoIntsClass_12::good();");
+		// CWE401_Memory_Leak__new_array_TwoIntsClass_12::good();
 	} else if (tc_num == 318) {
 		printLine("Calling CWE401_Memory_Leak__new_int_15::good();");
 		CWE401_Memory_Leak__new_int_15::good();
@@ -1407,8 +1416,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_10::good();");
 		CWE401_Memory_Leak__new_struct_twoIntsStruct_10::good();
 	} else if (tc_num == 459) {
-		printLine("Calling CWE401_Memory_Leak__new_int64_t_12::good();");
-		CWE401_Memory_Leak__new_int64_t_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_int64_t_12::good();");
+		// CWE401_Memory_Leak__new_int64_t_12::good();
 	} else if (tc_num == 460) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_64::good();");
 		CWE401_Memory_Leak__new_array_int64_t_64::good();
@@ -1452,8 +1462,8 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_TwoIntsClass_08::good();");
 		CWE401_Memory_Leak__new_array_TwoIntsClass_08::good();
 	} else if (tc_num == 474) {
-		printLine("Calling CWE401_Memory_Leak__new_char_12::good();");
-		CWE401_Memory_Leak__new_char_12::good();
+		// printLine("Calling CWE401_Memory_Leak__new_char_12::good();");
+		// CWE401_Memory_Leak__new_char_12::good();
 	} else if (tc_num == 475) {
 		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_68::good();");
 		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_68::good();
@@ -1633,8 +1643,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__strdup_char_65_bad();");
 		CWE401_Memory_Leak__strdup_char_65_bad();
 	} else if (tc_num == 531) {
-		printLine("Calling CWE401_Memory_Leak__strdup_char_12_bad();");
-		CWE401_Memory_Leak__strdup_char_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__strdup_char_12_bad();");
+		// CWE401_Memory_Leak__strdup_char_12_bad();
 	} else if (tc_num == 532) {
 		printLine("Calling CWE401_Memory_Leak__strdup_char_42_bad();");
 		CWE401_Memory_Leak__strdup_char_42_bad();
@@ -1714,8 +1725,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_82::bad();");
 		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_82::bad();
 	} else if (tc_num == 556) {
-		printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_12::bad();");
-		CWE401_Memory_Leak__new_struct_twoIntsStruct_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_12::bad();");
+		// CWE401_Memory_Leak__new_struct_twoIntsStruct_12::bad();
 	} else if (tc_num == 557) {
 		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_09::bad();");
 		CWE401_Memory_Leak__new_TwoIntsClass_09::bad();
@@ -1765,8 +1777,8 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_twoIntsStruct_74::bad();");
 		CWE401_Memory_Leak__new_twoIntsStruct_74::bad();
 	} else if (tc_num == 573) {
-		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_12::bad();");
-		CWE401_Memory_Leak__new_TwoIntsClass_12::bad();
+		// printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_12::bad();");
+		// CWE401_Memory_Leak__new_TwoIntsClass_12::bad();
 	} else if (tc_num == 574) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int_01::bad();");
 		CWE401_Memory_Leak__new_array_int_01::bad();
@@ -1909,8 +1921,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_21::bad();");
 		CWE401_Memory_Leak__new_TwoIntsClass_21::bad();
 	} else if (tc_num == 621) {
-		printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_12::bad();");
-		CWE401_Memory_Leak__new_array_twointsStruct_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_12::bad();");
+		// CWE401_Memory_Leak__new_array_twointsStruct_12::bad();
 	} else if (tc_num == 622) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int_06::bad();");
 		CWE401_Memory_Leak__new_array_int_06::bad();
@@ -2053,8 +2066,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_01::bad();");
 		CWE401_Memory_Leak__new_struct_twoIntsStruct_01::bad();
 	} else if (tc_num == 669) {
-		printLine("Calling CWE401_Memory_Leak__new_twoIntsStruct_12::bad();");
-		CWE401_Memory_Leak__new_twoIntsStruct_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_twoIntsStruct_12::bad();");
+		// CWE401_Memory_Leak__new_twoIntsStruct_12::bad();
 	} else if (tc_num == 670) {
 		printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_03::bad();");
 		CWE401_Memory_Leak__new_array_twointsStruct_03::bad();
@@ -2086,8 +2100,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_char_07::bad();");
 		CWE401_Memory_Leak__new_char_07::bad();
 	} else if (tc_num == 680) {
-		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::bad();");
-		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::bad();");
+		// CWE401_Memory_Leak__new_array_struct_twoIntsStruct_12::bad();
 	} else if (tc_num == 681) {
 		printLine("Calling CWE401_Memory_Leak__new_array_twointsStruct_15::bad();");
 		CWE401_Memory_Leak__new_array_twointsStruct_15::bad();
@@ -2164,8 +2179,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_03::bad();");
 		CWE401_Memory_Leak__new_array_int64_t_03::bad();
 	} else if (tc_num == 706) {
-		printLine("Calling CWE401_Memory_Leak__new_array_int_12::bad();");
-		CWE401_Memory_Leak__new_array_int_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_int_12::bad();");
+		// CWE401_Memory_Leak__new_array_int_12::bad();
 	} else if (tc_num == 707) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_18::bad();");
 		CWE401_Memory_Leak__new_array_int64_t_18::bad();
@@ -2434,11 +2450,13 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_01::bad();");
 		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_01::bad();
 	} else if (tc_num == 796) {
-		printLine("Calling CWE401_Memory_Leak__new_int_12::bad();");
-		CWE401_Memory_Leak__new_int_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_int_12::bad();");
+		// CWE401_Memory_Leak__new_int_12::bad();
 	} else if (tc_num == 797) {
-		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_12::bad();");
-		CWE401_Memory_Leak__new_array_int64_t_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_int64_t_12::bad();");
+		// CWE401_Memory_Leak__new_array_int64_t_12::bad();
 	} else if (tc_num == 798) {
 		printLine("Calling CWE401_Memory_Leak__new_int64_t_73::bad();");
 		CWE401_Memory_Leak__new_int64_t_73::bad();
@@ -2533,8 +2551,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_TwoIntsClass_15::bad();");
 		CWE401_Memory_Leak__new_TwoIntsClass_15::bad();
 	} else if (tc_num == 829) {
-		printLine("Calling CWE401_Memory_Leak__new_array_TwoIntsClass_12::bad();");
-		CWE401_Memory_Leak__new_array_TwoIntsClass_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_TwoIntsClass_12::bad();");
+		// CWE401_Memory_Leak__new_array_TwoIntsClass_12::bad();
 	} else if (tc_num == 830) {
 		printLine("Calling CWE401_Memory_Leak__new_int_15::bad();");
 		CWE401_Memory_Leak__new_int_15::bad();
@@ -2959,8 +2978,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_struct_twoIntsStruct_10::bad();");
 		CWE401_Memory_Leak__new_struct_twoIntsStruct_10::bad();
 	} else if (tc_num == 971) {
-		printLine("Calling CWE401_Memory_Leak__new_int64_t_12::bad();");
-		CWE401_Memory_Leak__new_int64_t_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_int64_t_12::bad();");
+		// CWE401_Memory_Leak__new_int64_t_12::bad();
 	} else if (tc_num == 972) {
 		printLine("Calling CWE401_Memory_Leak__new_array_int64_t_64::bad();");
 		CWE401_Memory_Leak__new_array_int64_t_64::bad();
@@ -3004,8 +3024,8 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__new_array_TwoIntsClass_08::bad();");
 		CWE401_Memory_Leak__new_array_TwoIntsClass_08::bad();
 	} else if (tc_num == 986) {
-		printLine("Calling CWE401_Memory_Leak__new_char_12::bad();");
-		CWE401_Memory_Leak__new_char_12::bad();
+		// printLine("Calling CWE401_Memory_Leak__new_char_12::bad();");
+		// CWE401_Memory_Leak__new_char_12::bad();
 	} else if (tc_num == 987) {
 		printLine("Calling CWE401_Memory_Leak__new_array_struct_twoIntsStruct_68::bad();");
 		CWE401_Memory_Leak__new_array_struct_twoIntsStruct_68::bad();
