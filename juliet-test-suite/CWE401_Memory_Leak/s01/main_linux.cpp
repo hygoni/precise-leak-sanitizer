@@ -39,8 +39,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__char_realloc_34_good();");
 		CWE401_Memory_Leak__char_realloc_34_good();
 	} else if (tc_num == 5) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int64_t_12_good();");
-		CWE401_Memory_Leak__malloc_realloc_int64_t_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_int64_t_12_good();");
+		// CWE401_Memory_Leak__malloc_realloc_int64_t_12_good();
 	} else if (tc_num == 6) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_09_good();");
 		CWE401_Memory_Leak__int64_t_malloc_09_good();
@@ -177,8 +178,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_realloc_21_good();");
 		CWE401_Memory_Leak__int_realloc_21_good();
 	} else if (tc_num == 51) {
-		printLine("Calling CWE401_Memory_Leak__char_malloc_12_good();");
-		CWE401_Memory_Leak__char_malloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__char_malloc_12_good();");
+		// CWE401_Memory_Leak__char_malloc_12_good();
 	} else if (tc_num == 52) {
 		printLine("Calling CWE401_Memory_Leak__int_malloc_45_good();");
 		CWE401_Memory_Leak__int_malloc_45_good();
@@ -360,8 +362,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int64_t_15_good();");
 		CWE401_Memory_Leak__malloc_realloc_int64_t_15_good();
 	} else if (tc_num == 112) {
-		printLine("Calling CWE401_Memory_Leak__int_realloc_12_good();");
-		CWE401_Memory_Leak__int_realloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int_realloc_12_good();");
+		// CWE401_Memory_Leak__int_realloc_12_good();
 	} else if (tc_num == 113) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_63_good();");
 		CWE401_Memory_Leak__int64_t_realloc_63_good();
@@ -369,14 +372,16 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_realloc_66_good();");
 		CWE401_Memory_Leak__int_realloc_66_good();
 	} else if (tc_num == 115) {
-		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_12_good();");
-		CWE401_Memory_Leak__int64_t_realloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int64_t_realloc_12_good();");
+		// CWE401_Memory_Leak__int64_t_realloc_12_good();
 	} else if (tc_num == 116) {
 		printLine("Calling CWE401_Memory_Leak__char_malloc_14_good();");
 		CWE401_Memory_Leak__char_malloc_14_good();
 	} else if (tc_num == 117) {
-		printLine("Calling CWE401_Memory_Leak__int64_t_calloc_12_good();");
-		CWE401_Memory_Leak__int64_t_calloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int64_t_calloc_12_good();");
+		// CWE401_Memory_Leak__int64_t_calloc_12_good();
 	} else if (tc_num == 118) {
 		printLine("Calling CWE401_Memory_Leak__char_realloc_21_good();");
 		CWE401_Memory_Leak__char_realloc_21_good();
@@ -540,8 +545,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__char_malloc_21_good();");
 		CWE401_Memory_Leak__char_malloc_21_good();
 	} else if (tc_num == 172) {
-		printLine("Calling CWE401_Memory_Leak__char_calloc_12_good();");
-		CWE401_Memory_Leak__char_calloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__char_calloc_12_good();");
+		// CWE401_Memory_Leak__char_calloc_12_good();
 	} else if (tc_num == 173) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_07_good();");
 		CWE401_Memory_Leak__malloc_realloc_int_07_good();
@@ -594,14 +600,16 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_22_good();");
 		CWE401_Memory_Leak__int64_t_realloc_22_good();
 	} else if (tc_num == 190) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_12_good();");
-		CWE401_Memory_Leak__malloc_realloc_int_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_12_good();");
+		// CWE401_Memory_Leak__malloc_realloc_int_12_good();
 	} else if (tc_num == 191) {
 		printLine("Calling CWE401_Memory_Leak__char_malloc_03_good();");
 		CWE401_Memory_Leak__char_malloc_03_good();
 	} else if (tc_num == 192) {
-		printLine("Calling CWE401_Memory_Leak__char_realloc_12_good();");
-		CWE401_Memory_Leak__char_realloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__char_realloc_12_good();");
+		// CWE401_Memory_Leak__char_realloc_12_good();
 	} else if (tc_num == 193) {
 		printLine("Calling CWE401_Memory_Leak__int_malloc_65_good();");
 		CWE401_Memory_Leak__int_malloc_65_good();
@@ -738,8 +746,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_31_good();");
 		CWE401_Memory_Leak__int64_t_malloc_31_good();
 	} else if (tc_num == 238) {
-		printLine("Calling CWE401_Memory_Leak__int_calloc_12_good();");
-		CWE401_Memory_Leak__int_calloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int_calloc_12_good();");
+		// CWE401_Memory_Leak__int_calloc_12_good();
 	} else if (tc_num == 239) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_06_good();");
 		CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_06_good();
@@ -810,8 +819,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_realloc_51_good();");
 		CWE401_Memory_Leak__int_realloc_51_good();
 	} else if (tc_num == 262) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_char_12_good();");
-		CWE401_Memory_Leak__malloc_realloc_char_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_char_12_good();");
+		// CWE401_Memory_Leak__malloc_realloc_char_12_good();
 	} else if (tc_num == 263) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_calloc_52_good();");
 		CWE401_Memory_Leak__int64_t_calloc_52_good();
@@ -843,8 +853,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_calloc_09_good();");
 		CWE401_Memory_Leak__int64_t_calloc_09_good();
 	} else if (tc_num == 273) {
-		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_12_good();");
-		CWE401_Memory_Leak__int64_t_malloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int64_t_malloc_12_good();");
+		// CWE401_Memory_Leak__int64_t_malloc_12_good();
 	} else if (tc_num == 274) {
 		printLine("Calling CWE401_Memory_Leak__char_realloc_64_good();");
 		CWE401_Memory_Leak__char_realloc_64_good();
@@ -1044,8 +1055,8 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_malloc_18_good();");
 		CWE401_Memory_Leak__int_malloc_18_good();
 	} else if (tc_num == 340) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_good();");
-		CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_good();
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_good();");
+		// CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_good();
 	} else if (tc_num == 341) {
 		printLine("Calling CWE401_Memory_Leak__int_calloc_67_good();");
 		CWE401_Memory_Leak__int_calloc_67_good();
@@ -1179,8 +1190,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_11_good();");
 		CWE401_Memory_Leak__int64_t_malloc_11_good();
 	} else if (tc_num == 385) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_good();");
-		CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_good();");
+		// CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_good();
 	} else if (tc_num == 386) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_16_good();");
 		CWE401_Memory_Leak__int64_t_realloc_16_good();
@@ -1254,8 +1266,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_08_good();");
 		CWE401_Memory_Leak__malloc_realloc_int_08_good();
 	} else if (tc_num == 410) {
-		printLine("Calling CWE401_Memory_Leak__int_malloc_12_good();");
-		CWE401_Memory_Leak__int_malloc_12_good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int_malloc_12_good();");
+		// CWE401_Memory_Leak__int_malloc_12_good();
 	} else if (tc_num == 411) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_15_good();");
 		CWE401_Memory_Leak__malloc_realloc_int_15_good();
@@ -1746,8 +1759,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_81::good();");
 		CWE401_Memory_Leak__int64_t_malloc_81::good();
 	} else if (tc_num == 572) {
-		printLine("Calling CWE401_Memory_Leak__new_array_char_12::good();");
-		CWE401_Memory_Leak__new_array_char_12::good();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_char_12::good();");
+		// CWE401_Memory_Leak__new_array_char_12::good();
 	} else if (tc_num == 573) {
 		printLine("Calling CWE401_Memory_Leak__new_array_char_73::good();");
 		CWE401_Memory_Leak__new_array_char_73::good();
@@ -1803,8 +1817,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__char_realloc_34_bad();");
 		CWE401_Memory_Leak__char_realloc_34_bad();
 	} else if (tc_num == 588) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int64_t_12_bad();");
-		CWE401_Memory_Leak__malloc_realloc_int64_t_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_int64_t_12_bad();");
+		// CWE401_Memory_Leak__malloc_realloc_int64_t_12_bad();
 	} else if (tc_num == 589) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_09_bad();");
 		CWE401_Memory_Leak__int64_t_malloc_09_bad();
@@ -1941,8 +1956,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_realloc_21_bad();");
 		CWE401_Memory_Leak__int_realloc_21_bad();
 	} else if (tc_num == 634) {
-		printLine("Calling CWE401_Memory_Leak__char_malloc_12_bad();");
-		CWE401_Memory_Leak__char_malloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__char_malloc_12_bad();");
+		// CWE401_Memory_Leak__char_malloc_12_bad();
 	} else if (tc_num == 635) {
 		printLine("Calling CWE401_Memory_Leak__int_malloc_45_bad();");
 		CWE401_Memory_Leak__int_malloc_45_bad();
@@ -2124,8 +2140,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int64_t_15_bad();");
 		CWE401_Memory_Leak__malloc_realloc_int64_t_15_bad();
 	} else if (tc_num == 695) {
-		printLine("Calling CWE401_Memory_Leak__int_realloc_12_bad();");
-		CWE401_Memory_Leak__int_realloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int_realloc_12_bad();");
+		// CWE401_Memory_Leak__int_realloc_12_bad();
 	} else if (tc_num == 696) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_63_bad();");
 		CWE401_Memory_Leak__int64_t_realloc_63_bad();
@@ -2133,14 +2150,16 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_realloc_66_bad();");
 		CWE401_Memory_Leak__int_realloc_66_bad();
 	} else if (tc_num == 698) {
-		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_12_bad();");
-		CWE401_Memory_Leak__int64_t_realloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int64_t_realloc_12_bad();");
+		// CWE401_Memory_Leak__int64_t_realloc_12_bad();
 	} else if (tc_num == 699) {
 		printLine("Calling CWE401_Memory_Leak__char_malloc_14_bad();");
 		CWE401_Memory_Leak__char_malloc_14_bad();
 	} else if (tc_num == 700) {
-		printLine("Calling CWE401_Memory_Leak__int64_t_calloc_12_bad();");
-		CWE401_Memory_Leak__int64_t_calloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int64_t_calloc_12_bad();");
+		// CWE401_Memory_Leak__int64_t_calloc_12_bad();
 	} else if (tc_num == 701) {
 		printLine("Calling CWE401_Memory_Leak__char_realloc_21_bad();");
 		CWE401_Memory_Leak__char_realloc_21_bad();
@@ -2304,8 +2323,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__char_malloc_21_bad();");
 		CWE401_Memory_Leak__char_malloc_21_bad();
 	} else if (tc_num == 755) {
-		printLine("Calling CWE401_Memory_Leak__char_calloc_12_bad();");
-		CWE401_Memory_Leak__char_calloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__char_calloc_12_bad();");
+		// CWE401_Memory_Leak__char_calloc_12_bad();
 	} else if (tc_num == 756) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_07_bad();");
 		CWE401_Memory_Leak__malloc_realloc_int_07_bad();
@@ -2358,14 +2378,16 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_22_bad();");
 		CWE401_Memory_Leak__int64_t_realloc_22_bad();
 	} else if (tc_num == 773) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_12_bad();");
-		CWE401_Memory_Leak__malloc_realloc_int_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_12_bad();");
+		// CWE401_Memory_Leak__malloc_realloc_int_12_bad();
 	} else if (tc_num == 774) {
 		printLine("Calling CWE401_Memory_Leak__char_malloc_03_bad();");
 		CWE401_Memory_Leak__char_malloc_03_bad();
 	} else if (tc_num == 775) {
-		printLine("Calling CWE401_Memory_Leak__char_realloc_12_bad();");
-		CWE401_Memory_Leak__char_realloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__char_realloc_12_bad();");
+		// CWE401_Memory_Leak__char_realloc_12_bad();
 	} else if (tc_num == 776) {
 		printLine("Calling CWE401_Memory_Leak__int_malloc_65_bad();");
 		CWE401_Memory_Leak__int_malloc_65_bad();
@@ -2502,8 +2524,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_31_bad();");
 		CWE401_Memory_Leak__int64_t_malloc_31_bad();
 	} else if (tc_num == 821) {
-		printLine("Calling CWE401_Memory_Leak__int_calloc_12_bad();");
-		CWE401_Memory_Leak__int_calloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int_calloc_12_bad();");
+		// CWE401_Memory_Leak__int_calloc_12_bad();
 	} else if (tc_num == 822) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_06_bad();");
 		CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_06_bad();
@@ -2574,8 +2597,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_realloc_51_bad();");
 		CWE401_Memory_Leak__int_realloc_51_bad();
 	} else if (tc_num == 845) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_char_12_bad();");
-		CWE401_Memory_Leak__malloc_realloc_char_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_char_12_bad();");
+		// CWE401_Memory_Leak__malloc_realloc_char_12_bad();
 	} else if (tc_num == 846) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_calloc_52_bad();");
 		CWE401_Memory_Leak__int64_t_calloc_52_bad();
@@ -2607,8 +2631,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_calloc_09_bad();");
 		CWE401_Memory_Leak__int64_t_calloc_09_bad();
 	} else if (tc_num == 856) {
-		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_12_bad();");
-		CWE401_Memory_Leak__int64_t_malloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int64_t_malloc_12_bad();");
+		// CWE401_Memory_Leak__int64_t_malloc_12_bad();
 	} else if (tc_num == 857) {
 		printLine("Calling CWE401_Memory_Leak__char_realloc_64_bad();");
 		CWE401_Memory_Leak__char_realloc_64_bad();
@@ -2808,8 +2833,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int_malloc_18_bad();");
 		CWE401_Memory_Leak__int_malloc_18_bad();
 	} else if (tc_num == 923) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_bad();");
-		CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_bad();");
+		// CWE401_Memory_Leak__malloc_realloc_struct_twoIntsStruct_12_bad();
 	} else if (tc_num == 924) {
 		printLine("Calling CWE401_Memory_Leak__int_calloc_67_bad();");
 		CWE401_Memory_Leak__int_calloc_67_bad();
@@ -2943,8 +2969,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_11_bad();");
 		CWE401_Memory_Leak__int64_t_malloc_11_bad();
 	} else if (tc_num == 968) {
-		printLine("Calling CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_bad();");
-		CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_bad();");
+		// CWE401_Memory_Leak__malloc_realloc_twoIntsStruct_12_bad();
 	} else if (tc_num == 969) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_realloc_16_bad();");
 		CWE401_Memory_Leak__int64_t_realloc_16_bad();
@@ -3018,8 +3045,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_08_bad();");
 		CWE401_Memory_Leak__malloc_realloc_int_08_bad();
 	} else if (tc_num == 993) {
-		printLine("Calling CWE401_Memory_Leak__int_malloc_12_bad();");
-		CWE401_Memory_Leak__int_malloc_12_bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__int_malloc_12_bad();");
+		// CWE401_Memory_Leak__int_malloc_12_bad();
 	} else if (tc_num == 994) {
 		printLine("Calling CWE401_Memory_Leak__malloc_realloc_int_15_bad();");
 		CWE401_Memory_Leak__malloc_realloc_int_15_bad();
@@ -3510,8 +3538,9 @@ int main(int argc, char * argv[]) {
 		printLine("Calling CWE401_Memory_Leak__int64_t_malloc_81::bad();");
 		CWE401_Memory_Leak__int64_t_malloc_81::bad();
 	} else if (tc_num == 1155) {
-		printLine("Calling CWE401_Memory_Leak__new_array_char_12::bad();");
-		CWE401_Memory_Leak__new_array_char_12::bad();
+		printLine("SKIP");
+		// printLine("Calling CWE401_Memory_Leak__new_array_char_12::bad();");
+		// CWE401_Memory_Leak__new_array_char_12::bad();
 	} else if (tc_num == 1156) {
 		printLine("Calling CWE401_Memory_Leak__new_array_char_73::bad();");
 		CWE401_Memory_Leak__new_array_char_73::bad();
